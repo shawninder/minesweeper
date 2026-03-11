@@ -21,7 +21,6 @@ jobs:
           node-version: 24
           cache: npm
 
-      # Cache Next.js build artifacts
       - uses: actions/cache@v4
         with:
           path: .next/cache
@@ -39,5 +38,11 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
-      - uses: actions/deploy-pages@v4
+      - id: deployment
+        uses: actions/deploy-pages@v4
