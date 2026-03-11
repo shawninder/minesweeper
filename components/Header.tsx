@@ -8,13 +8,16 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu"
+import { ChevronDown } from "lucide-react"
 
 export default function Header() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild className='my-4'>
         <Button variant='secondary'>
-          <h1 className='text-center text-2xl font-bold'>Minesweeper ⌄</h1>
+          <h1 className='text-center text-2xl font-bold'>
+            Minesweeper <ChevronDown className='inline-block' />
+          </h1>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent>
