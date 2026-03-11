@@ -1,7 +1,16 @@
+"use client"
+
+import { Toaster } from "@/components/ui/sonner"
+import { toast } from "sonner"
+
 export default function Gameboard() {
+  function onClick() {
+    toast.success("Ready")
+  }
+
   return (
-    <div>
-      <div className='grid grid-cols-9 grid-rows-9 w-96 h-96'>
+    <>
+      <div className='grid grid-cols-9 grid-rows-9 w-96 h-96' onClick={onClick}>
         {Array.from({ length: 81 }).map((_, idx) => (
           <button
             key={idx}
@@ -9,6 +18,7 @@ export default function Gameboard() {
           ></button>
         ))}
       </div>
-    </div>
+      <Toaster />
+    </>
   )
 }
