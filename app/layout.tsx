@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
+import { ServiceWorkerRegistrator } from "@/components/ServiceWorkerRegistrator"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,12 +15,18 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Minesweeper",
+  applicationName: "Minesweeper",
   description:
     "Classic mobile-ready Minesweeper game which you can play offline and add to your home screen for free without ads.",
   icons: {
     icon: "/favicon.ico"
   },
-  manifest: "/manifest.json"
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Minesweeper"
+  }
 }
 
 export const viewport: Viewport = {
@@ -40,6 +47,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <ServiceWorkerRegistrator />
         {children}
       </body>
     </html>
