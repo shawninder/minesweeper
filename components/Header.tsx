@@ -1,3 +1,5 @@
+"use client"
+
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -9,6 +11,11 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu"
 import { ChevronDown } from "lucide-react"
+import {
+  type GameSizeKey,
+  useGameState,
+  GAME_SIZES
+} from "@/components/GameStateProvider"
 
 export default function Header() {
   return (
@@ -23,9 +30,19 @@ export default function Header() {
       <DropdownMenuContent>
         <DropdownMenuGroup>
           <DropdownMenuLabel>Size</DropdownMenuLabel>
-          <Size label='Small' details='9x9 (10 mines)' shortcut='s' />
-          <Size label='Medium' details='16x16 (40 mines)' shortcut='m' />
-          <Size label='Large' details='30x16 (99 mines)' shortcut='l' />
+          {Object.keys(GAME_SIZES).map((sizeKey) => {
+            const { key, label, rows, cols, mines, shortcut } =
+              GAME_SIZES[sizeKey as GameSizeKey]
+            return (
+              <Size
+                key={sizeKey}
+                label={label}
+                details={`${rows}x${cols} (${mines} mines)`}
+                shortcut={shortcut}
+                value={key}
+              />
+            )
+          })}
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -36,10 +53,13 @@ type SizeProps = {
   label: string
   details: string
   shortcut: string
+  value: GameSizeKey
 }
-function Size({ label, details, shortcut }: SizeProps) {
+function Size({ label, details, shortcut, value }: SizeProps) {
+  const { setSizeKey } = useGameState()
+
   return (
-    <DropdownMenuItem>
+    <DropdownMenuItem onSelect={() => setSizeKey(value)} inset>
       <div>
         {label}
         <span className='block text-xs'>{details}</span>
