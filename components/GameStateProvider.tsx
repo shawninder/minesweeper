@@ -1,11 +1,11 @@
-"use client"
+'use client'
 
-import { createContext, useContext, useState, type ReactNode } from "react"
+import { createContext, useContext, useState, type ReactNode } from 'react'
 
-export type GameSizeKey = "small" | "medium" | "large"
+export type GameSizeKey = 'small' | 'medium' | 'large'
 
 export type GameSize = {
-  key: GameSizeKey
+  sizeKey: GameSizeKey
   label: string
   rows: number
   cols: number
@@ -15,35 +15,35 @@ export type GameSize = {
 
 const GAME_SIZES: Record<GameSizeKey, GameSize> = {
   small: {
-    key: "small",
-    label: "Small",
+    sizeKey: 'small',
+    label: 'Small',
     rows: 9,
     cols: 9,
     mines: 10,
-    shortcut: "s"
+    shortcut: 's'
   },
   medium: {
-    key: "medium",
-    label: "Medium",
+    sizeKey: 'medium',
+    label: 'Medium',
     rows: 16,
     cols: 16,
     mines: 40,
-    shortcut: "m"
+    shortcut: 'm'
   },
   large: {
-    key: "large",
-    label: "Large",
+    sizeKey: 'large',
+    label: 'Large',
     rows: 16,
     cols: 30,
     mines: 99,
-    shortcut: "l"
+    shortcut: 'l'
   }
 }
 
 type GameStateContextValue = {
   sizeKey: GameSizeKey
   size: GameSize
-  setSizeKey: (key: GameSizeKey) => void
+  setSizeKey: (sizeKey: GameSizeKey) => void
 }
 
 const GameStateContext = createContext<GameStateContextValue | undefined>(
@@ -51,7 +51,7 @@ const GameStateContext = createContext<GameStateContextValue | undefined>(
 )
 
 export function GameStateProvider({ children }: { children: ReactNode }) {
-  const [sizeKey, setSizeKey] = useState<GameSizeKey>("small")
+  const [sizeKey, setSizeKey] = useState<GameSizeKey>('small')
 
   const value: GameStateContextValue = {
     sizeKey,
@@ -69,7 +69,7 @@ export function GameStateProvider({ children }: { children: ReactNode }) {
 export function useGameState() {
   const ctx = useContext(GameStateContext)
   if (!ctx) {
-    throw new Error("useGameState must be used within a GameStateProvider")
+    throw new Error('useGameState must be used within a GameStateProvider')
   }
   return ctx
 }
