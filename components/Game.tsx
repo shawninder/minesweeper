@@ -2,9 +2,15 @@
 
 import { type GameSize } from '@/components/GameStateProvider'
 import { type MouseEventHandler, useState } from 'react'
+import { toast } from 'sonner'
 
 type GameState = 'ready' | 'playing' | 'lost' | 'won'
-type Cell = { nbAdjacentMines: number; disclosed: boolean }
+type Cell = {
+  isMine: boolean
+  nbAdjacentMines: number
+  isDisclosed: boolean
+  isFlagged: boolean
+}
 
 const COLORS = [
   'text-white-400',
@@ -25,13 +31,15 @@ export default function Game({
   className = ''
 }: GameSize & { className?: string }) {
   const nbCells = rows * cols
+  const initialCells = Array.from({ length: nbCells }).map(() => ({
+    isMine: false,
+    nbAdjacentMines: -1,
+    isDisclosed: false,
+    isFlagged: false
+  }))
+
   const [gameState, setGameState] = useState<GameState>('ready')
-  const [cells, setCells] = useState<Cell[]>(
-    Array.from({ length: nbCells }).map(() => ({
-      nbAdjacentMines: 0,
-      disclosed: false
-    }))
-  )
+  const [cells, setCells] = useState<Cell[]>(initialCells)
 
   const clickBoard: MouseEventHandler<HTMLDivElement> = function clickBoard(
     event
@@ -45,19 +53,58 @@ export default function Game({
     }
     const cellIdx = parseInt(target.dataset.idx || '', 10)
 
+    const isRightClick = event.type === 'contextmenu' || event.button === 2
+    const isCtrlClick = event.ctrlKey
+    const isShiftClick = event.shiftKey
+    const isMetaClick = event.metaKey
+    const isFlag = isRightClick || isCtrlClick || isShiftClick || isMetaClick
+
+    let newCells
     if (gameState === 'ready') {
       const withMines = generateMines(cells, cellIdx, mines)
       const withNumbers = numberCells(withMines, rows, cols)
-      setCells(withNumbers)
       setGameState('playing')
-      return setCells(discloseCell(withNumbers, rows, cols, cellIdx))
+      newCells = isFlag
+        ? flagCell(withNumbers, rows, cols, cellIdx)
+        : discloseCell(withNumbers, rows, cols, cellIdx)
+      setCells(newCells)
+    } else {
+      newCells = isFlag
+        ? flagCell(cells, rows, cols, cellIdx)
+        : discloseCell(cells, rows, cols, cellIdx)
+      setCells(newCells)
     }
-    return setCells(discloseCell(cells, rows, cols, cellIdx))
+    if (!isFlag && newCells[cellIdx].isMine) {
+      setGameState('lost')
+      toast('You Lose')
+    } else {
+      let lost = false
+      let unfinished = false
+      newCells.forEach(({ isDisclosed, isMine }) => {
+        if (!isMine && !isDisclosed) {
+          unfinished = true
+        }
+        if (isDisclosed && isMine) {
+          lost = true
+          setGameState('lost')
+          toast('You Lose')
+        }
+      })
+      if (!lost && !unfinished) {
+        setGameState('won')
+        toast('You Won!')
+      }
+    }
+  }
+
+  const newGame: MouseEventHandler<HTMLButtonElement> = function newGame() {
+    setCells(initialCells)
+    setGameState('ready')
   }
 
   return (
     <div className={className}>
-      {gameState}
+      {gameState} – <button onClick={newGame}>new</button>
       <div
         className='grid'
         style={{
@@ -66,41 +113,46 @@ export default function Game({
         }}
         onClick={clickBoard}
       >
-        {cells.map(({ nbAdjacentMines, disclosed }, idx) => {
-          const bg = disclosed
-            ? nbAdjacentMines === -1
-              ? 'bg-red-400'
-              : 'bg-gray-100'
-            : 'bg-gray-300'
-          const color = disclosed
-            ? nbAdjacentMines
-              ? COLORS[nbAdjacentMines]
+        {cells.map(
+          ({ isMine, nbAdjacentMines, isDisclosed, isFlagged }, idx) => {
+            const bg = isDisclosed
+              ? isMine
+                ? 'bg-red-400'
+                : 'bg-gray-100'
+              : 'bg-gray-300'
+            const color = isDisclosed
+              ? nbAdjacentMines
+                ? COLORS[nbAdjacentMines]
+                : ''
               : ''
-            : ''
-          return (
-            <button
-              key={idx}
-              className={`border border-gray-400 ${bg} ${color} w-full h-full aspect-square text-xs`}
-              data-idx={idx}
-            >
-              {disclosed
-                ? nbAdjacentMines === -1
-                  ? '💣'
-                  : nbAdjacentMines || ''
-                : ''}
-            </button>
-          )
-        })}
+            return (
+              <button
+                key={idx}
+                className={`border border-gray-400 ${bg} ${color} w-full h-full aspect-square text-xs`}
+                data-idx={idx}
+              >
+                {isDisclosed ? (isMine ? '💣' : nbAdjacentMines || '') : ''}
+                {isFlagged ? '🚩' : ''}
+              </button>
+            )
+          }
+        )}
       </div>
     </div>
   )
+}
+
+function flagCell(cells: Cell[], rows: number, cols: number, idx: number) {
+  const newCells = cells.map((cell) => ({ ...cell }))
+  newCells[idx].isFlagged = true
+  return newCells
 }
 
 function discloseCell(cells: Cell[], rows: number, cols: number, idx: number) {
   const newCells = cells.map((cell) => ({ ...cell }))
   const cell = newCells[idx]
   const { nbAdjacentMines } = cell
-  cell.disclosed = true
+  cell.isDisclosed = true
   if (nbAdjacentMines !== 0) {
     return newCells
   }
@@ -114,14 +166,14 @@ function discloseCell(cells: Cell[], rows: number, cols: number, idx: number) {
     }
     for (const neighborIdx of getNeighbors(newCells, rows, cols, current)) {
       const neighbor = newCells[neighborIdx]
-      if (neighbor.disclosed) {
+      if (neighbor.isDisclosed) {
         continue
       }
-      if (neighbor.nbAdjacentMines === -1) {
+      if (neighbor.isMine) {
         continue
       }
 
-      neighbor.disclosed = true
+      neighbor.isDisclosed = true
 
       if (neighbor.nbAdjacentMines === 0) {
         queue.push(neighborIdx)
@@ -134,18 +186,23 @@ function discloseCell(cells: Cell[], rows: number, cols: number, idx: number) {
 
 function numberCells(cells: Cell[], rows: number, cols: number) {
   const newCells = cells.map((cell, idx) => {
-    const { nbAdjacentMines } = cell
-    if (nbAdjacentMines === -1) {
+    const { isMine } = cell
+    if (isMine) {
       return cell
     }
     const neighbors = getNeighbors(cells, rows, cols, idx)
     const count = neighbors.reduce((nbMines, neighbor) => {
-      if (cells[neighbor].nbAdjacentMines === -1) {
+      if (cells[neighbor].isMine) {
         nbMines += 1
       }
       return nbMines
     }, 0)
-    return { nbAdjacentMines: count, disclosed: false }
+    return {
+      nbAdjacentMines: count,
+      isMine: false,
+      isDisclosed: false,
+      isFlagged: false
+    }
   })
   return newCells
 }
@@ -213,7 +270,7 @@ function generateMines(cells: Cell[], safeIdx: number, mines: number) {
   ])
     .slice(0, mines)
     .forEach((cellIdx) => {
-      newCells[cellIdx].nbAdjacentMines = -1
+      newCells[cellIdx].isMine = true
     })
   return newCells
 }
