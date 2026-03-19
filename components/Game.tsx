@@ -2,10 +2,9 @@
 
 import { type GameSize } from '@/components/GameStateProvider'
 import { type MouseEventHandler, useState } from 'react'
-import { toast } from 'sonner'
 
 type GameState = 'ready' | 'playing' | 'lost' | 'won'
-type Cell = undefined | number
+type Cell = { nbAdjacentMines: number; disclosed: boolean }
 
 const COLORS = [
   'text-white-400',
@@ -20,17 +19,19 @@ const COLORS = [
 ]
 
 export default function Game({
-  sizeKey,
-  label,
   rows,
   cols,
   mines,
-  shortcut,
   className = ''
 }: GameSize & { className?: string }) {
   const nbCells = rows * cols
   const [gameState, setGameState] = useState<GameState>('ready')
-  const [cells, setCells] = useState<Cell[]>(Array.from({ length: nbCells }))
+  const [cells, setCells] = useState<Cell[]>(
+    Array.from({ length: nbCells }).map(() => ({
+      nbAdjacentMines: 0,
+      disclosed: false
+    }))
+  )
 
   const clickBoard: MouseEventHandler<HTMLDivElement> = function clickBoard(
     event
@@ -48,12 +49,10 @@ export default function Game({
       const withMines = generateMines(cells, cellIdx, mines)
       const withNumbers = numberCells(withMines, rows, cols)
       setCells(withNumbers)
-      // disclose cell <cellIdx>
       setGameState('playing')
-      return
+      return setCells(discloseCell(withNumbers, rows, cols, cellIdx))
     }
-
-    // disclose cell <cellIdx>
+    return setCells(discloseCell(cells, rows, cols, cellIdx))
   }
 
   return (
@@ -67,33 +66,86 @@ export default function Game({
         }}
         onClick={clickBoard}
       >
-        {cells.map((cell, idx) => (
-          <button
-            key={idx}
-            className={`border border-gray-400 ${cell === -1 ? 'bg-red-400' : 'bg-gray-100'} ${cell ? COLORS[cell] : ''} w-full h-full aspect-square`}
-            data-idx={idx}
-          >
-            {cell === -1 ? '💣' : cell || ''}
-          </button>
-        ))}
+        {cells.map(({ nbAdjacentMines, disclosed }, idx) => {
+          const bg = disclosed
+            ? nbAdjacentMines === -1
+              ? 'bg-red-400'
+              : 'bg-gray-100'
+            : 'bg-gray-300'
+          const color = disclosed
+            ? nbAdjacentMines
+              ? COLORS[nbAdjacentMines]
+              : ''
+            : ''
+          return (
+            <button
+              key={idx}
+              className={`border border-gray-400 ${bg} ${color} w-full h-full aspect-square text-xs`}
+              data-idx={idx}
+            >
+              {disclosed
+                ? nbAdjacentMines === -1
+                  ? '💣'
+                  : nbAdjacentMines || ''
+                : ''}
+            </button>
+          )
+        })}
       </div>
     </div>
   )
 }
 
+function discloseCell(cells: Cell[], rows: number, cols: number, idx: number) {
+  const newCells = cells.map((cell) => ({ ...cell }))
+  const cell = newCells[idx]
+  const { nbAdjacentMines } = cell
+  cell.disclosed = true
+  if (nbAdjacentMines !== 0) {
+    return newCells
+  }
+  const queue: number[] = [idx]
+  let q = 0
+
+  while (q < queue.length) {
+    const current = queue[q++]
+    if (newCells[current].nbAdjacentMines !== 0) {
+      continue
+    }
+    for (const neighborIdx of getNeighbors(newCells, rows, cols, current)) {
+      const neighbor = newCells[neighborIdx]
+      if (neighbor.disclosed) {
+        continue
+      }
+      if (neighbor.nbAdjacentMines === -1) {
+        continue
+      }
+
+      neighbor.disclosed = true
+
+      if (neighbor.nbAdjacentMines === 0) {
+        queue.push(neighborIdx)
+      }
+    }
+  }
+
+  return newCells
+}
+
 function numberCells(cells: Cell[], rows: number, cols: number) {
   const newCells = cells.map((cell, idx) => {
-    if (cell === -1) {
+    const { nbAdjacentMines } = cell
+    if (nbAdjacentMines === -1) {
       return cell
     }
     const neighbors = getNeighbors(cells, rows, cols, idx)
-    const nbAdjacentMines = neighbors.reduce((nbMines, neighbor) => {
-      if (cells[neighbor] === -1) {
+    const count = neighbors.reduce((nbMines, neighbor) => {
+      if (cells[neighbor].nbAdjacentMines === -1) {
         nbMines += 1
       }
       return nbMines
     }, 0)
-    return nbAdjacentMines
+    return { nbAdjacentMines: count, disclosed: false }
   })
   return newCells
 }
@@ -101,48 +153,48 @@ function numberCells(cells: Cell[], rows: number, cols: number) {
 function getNeighbors(cells: Cell[], rows: number, cols: number, idx: number) {
   const neighbors = []
 
-  const notTopRow = idx > cols
+  const notTopRow = idx > cols - 1
   const notLeftCol = idx % rows !== 0
   const notRightCol = (idx - cols + 1) % rows !== 0
-  const notBottomRow = idx - cols < cells.length - cols
+  const notBottomRow = idx < cells.length - cols
 
   const upLeft = idx - cols - 1
-  if (notTopRow && notLeftCol && cells[upLeft] === -1) {
+  if (notTopRow && notLeftCol) {
     neighbors.push(upLeft)
   }
 
   const up = idx - cols
-  if (notTopRow && cells[up] === -1) {
+  if (notTopRow) {
     neighbors.push(up)
   }
 
   const upRight = idx - cols + 1
-  if (notTopRow && notRightCol && cells[upRight] === -1) {
+  if (notTopRow && notRightCol) {
     neighbors.push(upRight)
   }
 
   const right = idx + 1
-  if (notRightCol && cells[right] === -1) {
+  if (notRightCol) {
     neighbors.push(right)
   }
 
   const downRight = idx + cols + 1
-  if (notBottomRow && notRightCol && cells[downRight] === -1) {
+  if (notBottomRow && notRightCol) {
     neighbors.push(downRight)
   }
 
   const down = idx + cols
-  if (notBottomRow && cells[down] === -1) {
+  if (notBottomRow) {
     neighbors.push(down)
   }
 
   const downLeft = idx + cols - 1
-  if (notBottomRow && notLeftCol && cells[downLeft] === -1) {
+  if (notBottomRow && notLeftCol) {
     neighbors.push(downLeft)
   }
 
   const left = idx - 1
-  if (notLeftCol && cells[left] === -1) {
+  if (notLeftCol) {
     neighbors.push(left)
   }
 
@@ -150,7 +202,7 @@ function getNeighbors(cells: Cell[], rows: number, cols: number, idx: number) {
 }
 
 function generateMines(cells: Cell[], safeIdx: number, mines: number) {
-  const newCells = [...cells]
+  const newCells = cells.map((cell) => ({ ...cell }))
   shuffleArray([
     ...Array.from(cells).reduce<number[]>((arr, item, idx) => {
       if (idx !== safeIdx) {
@@ -161,7 +213,7 @@ function generateMines(cells: Cell[], safeIdx: number, mines: number) {
   ])
     .slice(0, mines)
     .forEach((cellIdx) => {
-      newCells[cellIdx] = -1
+      newCells[cellIdx].nbAdjacentMines = -1
     })
   return newCells
 }

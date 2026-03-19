@@ -1,6 +1,6 @@
-"use client"
+'use client'
 
-import { Button } from "@/components/ui/button"
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,13 +9,13 @@ import {
   DropdownMenuLabel,
   DropdownMenuShortcut,
   DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu"
-import { ChevronDown } from "lucide-react"
+} from '@/components/ui/dropdown-menu'
+import { ChevronDown } from 'lucide-react'
 import {
   type GameSizeKey,
   useGameState,
   GAME_SIZES
-} from "@/components/GameStateProvider"
+} from '@/components/GameStateProvider'
 
 export default function Header() {
   return (
@@ -31,8 +31,8 @@ export default function Header() {
         <DropdownMenuGroup>
           <DropdownMenuLabel>Size</DropdownMenuLabel>
           {Object.keys(GAME_SIZES).map((sizeKey) => {
-            const { key, label, rows, cols, mines, shortcut } =
-              GAME_SIZES[sizeKey as GameSizeKey]
+            const key = sizeKey as GameSizeKey
+            const { label, rows, cols, mines, shortcut } = GAME_SIZES[key]
             return (
               <Size
                 key={sizeKey}

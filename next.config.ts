@@ -6,8 +6,8 @@ const isProd = process.env.NODE_ENV === 'production'
 const nextConfig: NextConfig = {
   /* config options here */
   output: 'export',
-  basePath: isProd ? `/${repo}` : '',
-  assetPrefix: isProd ? `/${repo}/` : ''
+  basePath: isProd && repo ? `/${repo}` : '',
+  assetPrefix: isProd && repo ? `/${repo}/` : ''
 };
 
 export default nextConfig;
