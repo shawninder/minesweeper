@@ -1,40 +1,40 @@
-import type { Metadata, Viewport } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
-import "./globals.css"
-import { ServiceWorkerRegistrator } from "@/components/ServiceWorkerRegistrator"
+import type { Metadata, Viewport } from 'next'
+import { Geist, Geist_Mono } from 'next/font/google'
+import './globals.css'
+import { ServiceWorkerRegistrator } from '@/components/ServiceWorkerRegistrator'
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"]
+  variable: '--font-geist-sans',
+  subsets: ['latin']
 })
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"]
+  variable: '--font-geist-mono',
+  subsets: ['latin']
 })
 
 export const metadata: Metadata = {
-  title: "Minesweeper",
-  applicationName: "Minesweeper",
+  title: 'Minesweeper',
+  applicationName: 'Minesweeper',
   description:
-    "Classic mobile-ready Minesweeper game which you can play offline and add to your home screen for free without ads.",
+    'Classic mobile-ready Minesweeper game which you can play offline and add to your home screen for free without ads.',
   icons: {
-    icon: "/favicon.ico"
+    icon: '/favicon.ico'
   },
-  manifest: "/manifest.json",
+  manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
-    statusBarStyle: "black-translucent",
-    title: "Minesweeper"
+    statusBarStyle: 'black-translucent',
+    title: 'Minesweeper'
   }
 }
 
 export const viewport: Viewport = {
-  width: "device-width",
+  width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#0a0a0a"
+  themeColor: '#0a0a0a'
 }
 
 export default function RootLayout({

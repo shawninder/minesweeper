@@ -4,8 +4,8 @@ import { type GameSize } from '@/components/GameStateProvider'
 import { type MouseEventHandler, useState } from 'react'
 import { toast } from 'sonner'
 
-type GameState = 'ready' | 'playing' | 'lost' | 'won'
-type Cell = {
+export type GameState = 'ready' | 'playing' | 'lost' | 'won'
+export type Cell = {
   isMine: boolean
   nbAdjacentMines: number
   isDisclosed: boolean
@@ -74,7 +74,7 @@ export default function Game({
         : discloseCell(cells, rows, cols, cellIdx)
       setCells(newCells)
     }
-    if (!isFlag && newCells[cellIdx].isMine) {
+    if (!isFlag && newCells[cellIdx].isMine && newCells[cellIdx].isDisclosed) {
       setGameState('lost')
       toast('You Lose')
     } else {
@@ -113,70 +113,115 @@ export default function Game({
         }}
         onClick={clickBoard}
       >
-        {cells.map(
-          ({ isMine, nbAdjacentMines, isDisclosed, isFlagged }, idx) => {
-            const bg = isDisclosed
-              ? isMine
-                ? 'bg-red-400'
-                : 'bg-gray-100'
-              : 'bg-gray-300'
-            const color = isDisclosed
-              ? nbAdjacentMines
-                ? COLORS[nbAdjacentMines]
-                : ''
-              : ''
-            return (
-              <button
-                key={idx}
-                className={`border border-gray-400 ${bg} ${color} w-full h-full aspect-square text-xs`}
-                data-idx={idx}
-              >
-                {isDisclosed ? (isMine ? '💣' : nbAdjacentMines || '') : ''}
-                {isFlagged ? '🚩' : ''}
-              </button>
-            )
-          }
-        )}
+        {cells.map(cellMap)}
       </div>
     </div>
   )
 }
 
+export function cellMap(
+  { isMine, nbAdjacentMines, isDisclosed, isFlagged }: Cell,
+  idx: number
+) {
+  const bg = isDisclosed
+    ? isMine
+      ? 'bg-red-400'
+      : 'bg-gray-100'
+    : 'bg-gray-300'
+  const color = isDisclosed
+    ? nbAdjacentMines
+      ? COLORS[nbAdjacentMines]
+      : ''
+    : ''
+  return (
+    <button
+      key={idx}
+      className={`border border-gray-400 ${bg} ${color} w-full h-full aspect-square text-xs`}
+      data-idx={idx}
+    >
+      {isDisclosed ? (isMine ? '💣' : nbAdjacentMines || '') : ''}
+      {isFlagged ? '🚩' : ''}
+    </button>
+  )
+}
+
 function flagCell(cells: Cell[], rows: number, cols: number, idx: number) {
+  const { isDisclosed, isFlagged } = cells[idx]
+  if (isDisclosed) {
+    return cells
+  }
+
   const newCells = cells.map((cell) => ({ ...cell }))
-  newCells[idx].isFlagged = true
+
+  newCells[idx].isFlagged = !isFlagged
   return newCells
 }
 
 function discloseCell(cells: Cell[], rows: number, cols: number, idx: number) {
-  const newCells = cells.map((cell) => ({ ...cell }))
+  let newCells = cells.map((cell) => ({ ...cell }))
   const cell = newCells[idx]
-  const { nbAdjacentMines } = cell
-  cell.isDisclosed = true
-  if (nbAdjacentMines !== 0) {
-    return newCells
-  }
-  const queue: number[] = [idx]
-  let q = 0
+  const { nbAdjacentMines, isFlagged } = cell
+  const wasDisclosed = cell.isDisclosed
+  if (isFlagged) {
+    cell.isFlagged = false
+  } else {
+    cell.isDisclosed = true
+    if (nbAdjacentMines !== 0) {
+      // "Chording" should only happen when the user clicks an already-disclosed
+      // numbered cell. Otherwise, you can recursively re-trigger yourself.
+      if (wasDisclosed) {
+        const neighbors = getNeighbors(newCells, rows, cols, idx)
+        const [nbAdjFlags, nbAdjMines, nbMistakes, toDisclose] =
+          neighbors.reduce<[number, number, number, number[]]>(
+            ([nbFlags, nbMines, nbMistakes, toDisclose], cellIdx) => {
+              const { isFlagged, isMine, isDisclosed } = newCells[cellIdx]
+              if (isFlagged) nbFlags += 1
+              if (isMine) nbMines += 1
+              if (isFlagged && !isMine) nbMistakes += 1
 
-  while (q < queue.length) {
-    const current = queue[q++]
-    if (newCells[current].nbAdjacentMines !== 0) {
-      continue
+              // Only disclose cells that are both safe and not already open.
+              if (!isFlagged && !isMine && !isDisclosed) {
+                toDisclose.push(cellIdx)
+              }
+
+              return [nbFlags, nbMines, nbMistakes, toDisclose]
+            },
+            [0, 0, 0, []]
+          )
+
+        if (nbAdjFlags === nbAdjMines && nbMistakes === 0) {
+          toDisclose.forEach((cellIdx) => {
+            newCells = discloseCell(newCells, rows, cols, cellIdx)
+          })
+        } else {
+          // Punish mistakes?
+          toast('Oops!')
+        }
+      }
+      return newCells // numbered cells never auto-expand beyond chord
     }
-    for (const neighborIdx of getNeighbors(newCells, rows, cols, current)) {
-      const neighbor = newCells[neighborIdx]
-      if (neighbor.isDisclosed) {
+    const queue: number[] = [idx]
+    let q = 0
+
+    while (q < queue.length) {
+      const current = queue[q++]
+      if (newCells[current].nbAdjacentMines !== 0) {
         continue
       }
-      if (neighbor.isMine) {
-        continue
-      }
+      for (const neighborIdx of getNeighbors(newCells, rows, cols, current)) {
+        const neighbor = newCells[neighborIdx]
+        if (neighbor.isDisclosed) {
+          continue
+        }
+        if (neighbor.isMine) {
+          continue
+        }
 
-      neighbor.isDisclosed = true
+        neighbor.isDisclosed = true
 
-      if (neighbor.nbAdjacentMines === 0) {
-        queue.push(neighborIdx)
+        if (neighbor.nbAdjacentMines === 0) {
+          queue.push(neighborIdx)
+        }
       }
     }
   }
@@ -211,8 +256,8 @@ function getNeighbors(cells: Cell[], rows: number, cols: number, idx: number) {
   const neighbors = []
 
   const notTopRow = idx > cols - 1
-  const notLeftCol = idx % rows !== 0
-  const notRightCol = (idx - cols + 1) % rows !== 0
+  const notLeftCol = idx % cols !== 0
+  const notRightCol = idx % cols !== cols - 1
   const notBottomRow = idx < cells.length - cols
 
   const upLeft = idx - cols - 1
