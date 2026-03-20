@@ -13,15 +13,15 @@ export type Cell = {
 }
 
 const COLORS = [
-  'text-white-400',
-  'text-blue-400',
-  'text-green-400',
-  'text-red-400',
-  'text-navy-400',
-  'text-brown-400',
-  'text-teal-400',
-  'text-black-400',
-  'text-gray-400'
+  '',
+  'text-blue-500 dark:text-blue-300',
+  'text-emerald-500 dark:text-emerald-300',
+  'text-red-500 dark:text-red-300',
+  'text-indigo-500 dark:text-indigo-300',
+  'text-amber-500 dark:text-amber-300',
+  'text-teal-500 dark:text-teal-300',
+  'text-fuchsia-500 dark:text-fuchsia-300',
+  'text-slate-300 dark:text-slate-200'
 ]
 
 export default function Game({
@@ -104,7 +104,13 @@ export default function Game({
 
   return (
     <div className={className}>
-      {gameState} – <button onClick={newGame}>new</button>
+      {gameState} –{' '}
+      <button
+        onClick={newGame}
+        className='ml-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground hover:bg-muted'
+      >
+        new
+      </button>
       <div
         className='grid'
         style={{
@@ -125,9 +131,9 @@ export function cellMap(
 ) {
   const bg = isDisclosed
     ? isMine
-      ? 'bg-red-400'
-      : 'bg-gray-100'
-    : 'bg-gray-300'
+      ? 'bg-red-400 dark:bg-red-600'
+      : 'bg-gray-100 dark:bg-gray-800'
+    : 'bg-gray-300 dark:bg-gray-700'
   const color = isDisclosed
     ? nbAdjacentMines
       ? COLORS[nbAdjacentMines]
@@ -136,7 +142,7 @@ export function cellMap(
   return (
     <button
       key={idx}
-      className={`border border-gray-400 ${bg} ${color} w-full h-full aspect-square text-xs`}
+      className={`border border-gray-400 dark:border-gray-600 ${bg} ${color} w-full h-full aspect-square text-xs`}
       data-idx={idx}
     >
       {isDisclosed ? (isMine ? '💣' : nbAdjacentMines || '') : ''}
