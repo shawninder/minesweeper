@@ -3,6 +3,7 @@
 import { type GameSize } from '@/components/GameStateProvider'
 import { type MouseEventHandler, useState } from 'react'
 import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
 
 export type GameState = 'ready' | 'playing' | 'lost' | 'won'
 export type Cell = {
@@ -23,6 +24,13 @@ const COLORS = [
   'text-fuchsia-500 dark:text-fuchsia-300',
   'text-slate-300 dark:text-slate-200'
 ]
+
+const borderColors: Record<GameState, string> = {
+  ready: '[&>button]:border-blue-400 dark:[&>button]:border-blue-600',
+  playing: '[&>button]:border-gray-400 dark:[&>button]:border-gray-600',
+  lost: '[&>button]:border-red-400 dark:[&>button]:border-red-600',
+  won: '[&>button]:border-green-400 dark:[&>button]:border-green-600'
+}
 
 export default function Game({
   rows,
@@ -102,17 +110,15 @@ export default function Game({
     setGameState('ready')
   }
 
+  const borderColor = borderColors[gameState]
+
   return (
     <div className={className}>
-      {gameState} –{' '}
-      <button
-        onClick={newGame}
-        className='ml-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground hover:bg-muted'
-      >
-        new
-      </button>
+      <Button onClick={newGame}>new game</Button>
+      {' – '}
+      {gameState}
       <div
-        className='grid'
+        className={`grid ${borderColor}`}
         style={{
           gridTemplateColumns: `repeat(${cols}, 2em)`,
           gridTemplateRows: `repeat(${rows}, 2em)`
@@ -142,7 +148,7 @@ export function cellMap(
   return (
     <button
       key={idx}
-      className={`border border-gray-400 dark:border-gray-600 ${bg} ${color} w-full h-full aspect-square text-xs`}
+      className={`border ${bg} ${color} w-full h-full aspect-square text-xs`}
       data-idx={idx}
     >
       {isDisclosed ? (isMine ? '💣' : nbAdjacentMines || '') : ''}
@@ -185,7 +191,6 @@ function discloseCell(cells: Cell[], rows: number, cols: number, idx: number) {
               if (isMine) nbMines += 1
               if (isFlagged && !isMine) nbMistakes += 1
 
-              // Only disclose cells that are both safe and not already open.
               if (!isFlagged && !isMine && !isDisclosed) {
                 toDisclose.push(cellIdx)
               }
@@ -204,7 +209,7 @@ function discloseCell(cells: Cell[], rows: number, cols: number, idx: number) {
           toast('Oops!')
         }
       }
-      return newCells // numbered cells never auto-expand beyond chord
+      return newCells
     }
     const queue: number[] = [idx]
     let q = 0
