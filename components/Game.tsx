@@ -53,7 +53,7 @@ export default function Game({
     event
   ) {
     if (gameState === 'won' || gameState === 'lost') {
-      return
+      return newGame(event)
     }
     const target = event.target as HTMLButtonElement
     if (!target) {
@@ -88,35 +88,40 @@ export default function Game({
     } else {
       let lost = false
       let unfinished = false
-      newCells.forEach(({ isDisclosed, isMine }) => {
-        if (!isMine && !isDisclosed) {
+      newCells.forEach(({ isDisclosed, isMine, isFlagged }) => {
+        if (!isFlagged && !isDisclosed) {
           unfinished = true
         }
         if (isDisclosed && isMine) {
           lost = true
-          setGameState('lost')
-          toast('You Lose')
         }
       })
-      if (!lost && !unfinished) {
-        setGameState('won')
-        toast('You Won!')
+      if (lost) {
+        lose()
+      } else if (!unfinished) {
+        win()
       }
     }
   }
 
-  const newGame: MouseEventHandler<HTMLButtonElement> = function newGame() {
-    setCells(initialCells)
-    setGameState('ready')
+  function lose() {
+    setGameState('lost')
   }
+  function win() {
+    setGameState('won')
+  }
+
+  const newGame: MouseEventHandler<HTMLButtonElement | HTMLDivElement> =
+    function newGame() {
+      setCells(initialCells)
+      setGameState('ready')
+    }
 
   const borderColor = borderColors[gameState]
 
   return (
     <div className={className}>
       <Button onClick={newGame}>new game</Button>
-      {' – '}
-      {gameState}
       <div
         className={`grid ${borderColor}`}
         style={{
@@ -200,13 +205,22 @@ function discloseCell(cells: Cell[], rows: number, cols: number, idx: number) {
             [0, 0, 0, []]
           )
 
-        if (nbAdjFlags === nbAdjMines && nbMistakes === 0) {
-          toDisclose.forEach((cellIdx) => {
-            newCells = discloseCell(newCells, rows, cols, cellIdx)
-          })
-        } else {
-          // Punish mistakes?
-          toast('Oops!')
+        if (nbMistakes === 0) {
+          if (nbAdjFlags === nbAdjMines) {
+            toDisclose.forEach((cellIdx) => {
+              newCells = discloseCell(newCells, rows, cols, cellIdx)
+            })
+          } else {
+            console.log(
+              JSON.stringify({
+                nbAdjFlags,
+                nbAdjMines,
+                idx,
+                nbAdjacentMines,
+                isFlagged
+              })
+            )
+          }
         }
       }
       return newCells
