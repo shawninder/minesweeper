@@ -3,7 +3,6 @@
 import { type GameSize } from '@/components/GameStateProvider'
 import { type MouseEventHandler, useState } from 'react'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
 
 export type GameState = 'ready' | 'playing' | 'lost' | 'won'
 export type Cell = {
@@ -111,17 +110,15 @@ export default function Game({
     setGameState('won')
   }
 
-  const newGame: MouseEventHandler<HTMLButtonElement | HTMLDivElement> =
-    function newGame() {
-      setCells(initialCells)
-      setGameState('ready')
-    }
+  const newGame: MouseEventHandler<HTMLDivElement> = function newGame() {
+    setCells(initialCells)
+    setGameState('ready')
+  }
 
   const borderColor = borderColors[gameState]
 
   return (
     <div className={className}>
-      <Button onClick={newGame}>new game</Button>
       <div
         className={`grid ${borderColor}`}
         style={{
@@ -129,6 +126,7 @@ export default function Game({
           gridTemplateRows: `repeat(${rows}, 2em)`
         }}
         onClick={clickBoard}
+        onDoubleClick={newGame}
       >
         {cells.map(cellMap)}
       </div>
