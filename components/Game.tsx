@@ -64,24 +64,29 @@ export default function Game({
     const isCtrlClick = event.ctrlKey
     const isShiftClick = event.shiftKey
     const isMetaClick = event.metaKey
-    const isFlag = isRightClick || isCtrlClick || isShiftClick || isMetaClick
+    const isSpecialClick =
+      isRightClick || isCtrlClick || isShiftClick || isMetaClick
 
     let newCells
     if (gameState === 'ready') {
       const withMines = generateMines(cells, cellIdx, mines)
       const withNumbers = numberCells(withMines, rows, cols)
       setGameState('playing')
-      newCells = isFlag
-        ? flagCell(withNumbers, rows, cols, cellIdx)
-        : discloseCell(withNumbers, rows, cols, cellIdx)
-      setCells(newCells)
+      newCells = discloseCell(withNumbers, rows, cols, cellIdx)
     } else {
-      newCells = isFlag
-        ? flagCell(cells, rows, cols, cellIdx)
-        : discloseCell(cells, rows, cols, cellIdx)
-      setCells(newCells)
+      const { isDisclosed } = cells[cellIdx]
+      newCells = isSpecialClick
+        ? discloseCell(cells, rows, cols, cellIdx)
+        : isDisclosed
+          ? discloseCell(cells, rows, cols, cellIdx)
+          : flagCell(cells, rows, cols, cellIdx)
     }
-    if (!isFlag && newCells[cellIdx].isMine && newCells[cellIdx].isDisclosed) {
+    setCells(newCells)
+    if (
+      isSpecialClick &&
+      newCells[cellIdx].isMine &&
+      newCells[cellIdx].isDisclosed
+    ) {
       setGameState('lost')
       toast('You Lose')
     } else {
