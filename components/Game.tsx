@@ -48,16 +48,24 @@ export default function Game({
   const [gameState, setGameState] = useState<GameState>('ready')
   const [cells, setCells] = useState<Cell[]>(initialCells)
 
+  const doubleClickBoard: MouseEventHandler<HTMLDivElement> =
+    function doubleClickBoard(event) {
+      if (gameState === 'playing') {
+        const target = getTarget(event)
+        const cellIdx = parseInt(target.dataset.idx || '', 10)
+        const newCells = discloseCell(cells, rows, cols, cellIdx)
+        setCells(newCells)
+        checkForEnd(newCells, cellIdx)
+      }
+    }
+
   const clickBoard: MouseEventHandler<HTMLDivElement> = function clickBoard(
     event
   ) {
     if (gameState === 'won' || gameState === 'lost') {
       return newGame(event)
     }
-    const target = event.target as HTMLButtonElement
-    if (!target) {
-      throw Error("Can't find click target")
-    }
+    const target = getTarget(event)
     const cellIdx = parseInt(target.dataset.idx || '', 10)
 
     const isRightClick = event.type === 'contextmenu' || event.button === 2
@@ -82,17 +90,21 @@ export default function Game({
           : flagCell(cells, rows, cols, cellIdx)
     }
     setCells(newCells)
-    if (
-      isSpecialClick &&
-      newCells[cellIdx].isMine &&
-      newCells[cellIdx].isDisclosed
-    ) {
+    checkForEnd(newCells, cellIdx, isSpecialClick)
+  }
+
+  function checkForEnd(
+    cells: Cell[],
+    cellIdx: number,
+    disclosing: boolean = true
+  ) {
+    if (disclosing && cells[cellIdx].isMine && cells[cellIdx].isDisclosed) {
       setGameState('lost')
       toast('You Lose')
     } else {
       let lost = false
       let unfinished = false
-      newCells.forEach(({ isDisclosed, isMine, isFlagged }) => {
+      cells.forEach(({ isDisclosed, isMine, isFlagged }) => {
         if (!isFlagged && !isDisclosed) {
           unfinished = true
         }
@@ -106,6 +118,14 @@ export default function Game({
         win()
       }
     }
+  }
+
+  function getTarget(event: React.MouseEvent<HTMLDivElement, MouseEvent>) {
+    const target = event.target as HTMLButtonElement
+    if (!target) {
+      throw Error("Can't find click target")
+    }
+    return target
   }
 
   function lose() {
@@ -131,7 +151,7 @@ export default function Game({
           gridTemplateRows: `repeat(${rows}, 2em)`
         }}
         onClick={clickBoard}
-        onDoubleClick={newGame}
+        onDoubleClick={doubleClickBoard}
       >
         {cells.map(cellMap)}
       </div>
