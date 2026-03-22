@@ -1,6 +1,13 @@
 'use client'
 
-import { type MouseEventHandler, useEffect, useRef, useState } from 'react'
+import {
+  type MouseEventHandler,
+  type PointerEventHandler,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState
+} from 'react'
 
 import { toast } from 'sonner'
 import { Toaster } from '@/components/ui/sonner'
@@ -29,7 +36,7 @@ const COLORS = [
 ]
 
 const borderColors: Record<GameState, string> = {
-  loading: '[&>button]:border-purple-400 dark:[&>button]:border-purple-600',
+  loading: '[&>button]:border-blue-500 dark:[&>button]:border-blue-500',
   ready: '[&>button]:border-blue-400 dark:[&>button]:border-blue-600',
   playing: '[&>button]:border-gray-400 dark:[&>button]:border-gray-600',
   lost: '[&>button]:border-red-400 dark:[&>button]:border-red-600',
@@ -37,7 +44,7 @@ const borderColors: Record<GameState, string> = {
 }
 
 const bgColors: Record<GameState, string> = {
-  loading: 'bg-purple-400 dark:bg-purple-600',
+  loading: 'bg-blue-500 dark:bg-blue-500',
   ready: 'bg-blue-400 dark:bg-blue-600',
   playing: 'bg-gray-400 dark:bg-gray-600',
   lost: 'bg-red-400 dark:bg-red-600',
@@ -53,11 +60,12 @@ type AvailableSpace = {
   height: number
 }
 
-const cellPx = 32
+const cellPx = 56 // Should match `--ms-cell-size`
+const LONG_PRESS_MS = 300
 
 const defaultAvailableSpace = {
-  width: 32,
-  height: 32
+  width: cellPx,
+  height: cellPx
 }
 
 function makeCells(nbCells: number) {
@@ -71,6 +79,12 @@ function makeCells(nbCells: number) {
 
 function Game() {
   const gameRef = useRef<HTMLDivElement>(null)
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const longPressCellIdxRef = useRef<number | null>(null)
+  const suppressNextClickRef = useRef(false)
+  // const chordPointerIdRef = useRef<number | null>(null)
+  const suppressContextMenuRef = useRef(false)
+
   const [gameState, setGameState] = useState<GameState>('loading')
   const [availableSpace, setAvailableSpace] = useState<AvailableSpace>(
     defaultAvailableSpace
@@ -82,6 +96,37 @@ function Game() {
   const nbCells = rows * cols
   const initialCells = makeCells(nbCells)
   const [cells, setCells] = useState<Cell[]>(initialCells)
+
+  const cellsRef = useRef(cells)
+  const gameStateRef = useRef(gameState)
+  const rowsRef = useRef(rows)
+  const colsRef = useRef(cols)
+
+  useLayoutEffect(() => {
+    cellsRef.current = cells
+    gameStateRef.current = gameState
+    rowsRef.current = rows
+    colsRef.current = cols
+  }, [cells, gameState, rows, cols])
+
+  function clearLongPressTimer() {
+    if (longPressTimerRef.current != null) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+  }
+
+  function endChordGesture(event: React.PointerEvent<HTMLDivElement>) {
+    clearLongPressTimer()
+    longPressCellIdxRef.current = null
+    // if (chordPointerIdRef.current !== event.pointerId) return
+    // chordPointerIdRef.current = null
+    suppressContextMenuRef.current = false
+    // const t = event.currentTarget
+    // if (t.hasPointerCapture(event.pointerId)) {
+    //   t.releasePointerCapture(event.pointerId)
+    // }
+  }
 
   useEffect(() => {
     const el = gameRef.current
@@ -104,20 +149,69 @@ function Game() {
     }
   }, [gameState])
 
-  const doubleClickBoard: MouseEventHandler<HTMLDivElement> =
-    function doubleClickBoard(event) {
-      if (gameState === 'playing') {
-        const target = getTarget(event)
-        const cellIdx = parseInt(target.dataset.idx || '', 10)
-        const newCells = discloseCell(cells, rows, cols, cellIdx)
-        setCells(newCells)
-        checkForEnd(newCells, cellIdx)
-      }
+  function cellIdxFromPointerEvent(event: {
+    target: EventTarget | null
+  }): number | null {
+    const target = event.target
+    if (!(target instanceof Element)) return null
+    const el = target.closest('[data-idx]')
+    if (!el) return null
+    const idx = parseInt(el.getAttribute('data-idx') || '', 10)
+    return Number.isFinite(idx) ? idx : null
+  }
+
+  const pointerDownBoard: PointerEventHandler<HTMLDivElement> = (event) => {
+    if (event.button !== 0) return
+    const cellIdx = cellIdxFromPointerEvent(event)
+    if (cellIdx == null) return
+    // chordPointerIdRef.current = event.pointerId
+    suppressContextMenuRef.current = true
+    // event.currentTarget.setPointerCapture(event.pointerId)
+    longPressCellIdxRef.current = cellIdx
+    clearLongPressTimer()
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTimerRef.current = null
+      if (gameStateRef.current !== 'playing') return
+      const idx = longPressCellIdxRef.current
+      if (idx == null) return
+      suppressNextClickRef.current = true
+      const newCells = discloseCell(
+        cellsRef.current,
+        rowsRef.current,
+        colsRef.current,
+        idx
+      )
+      setCells(newCells)
+      checkForEnd(newCells, idx)
+    }, LONG_PRESS_MS)
+  }
+
+  const pointerUpBoard: PointerEventHandler<HTMLDivElement> = (event) => {
+    endChordGesture(event)
+  }
+
+  const contextMenuBoard: MouseEventHandler<HTMLDivElement> = (event) => {
+    if (suppressContextMenuRef.current) {
+      event.preventDefault()
     }
+  }
+
+  const pointerMoveBoard: PointerEventHandler<HTMLDivElement> = (event) => {
+    if (longPressCellIdxRef.current == null) return
+    const cellIdx = cellIdxFromPointerEvent(event)
+    if (cellIdx !== longPressCellIdxRef.current) {
+      clearLongPressTimer()
+      longPressCellIdxRef.current = null
+    }
+  }
 
   const clickBoard: MouseEventHandler<HTMLDivElement> = function clickBoard(
     event
   ) {
+    if (suppressNextClickRef.current) {
+      suppressNextClickRef.current = false
+      return
+    }
     if (gameState === 'won' || gameState === 'lost') {
       return newGame(event)
     }
@@ -213,13 +307,18 @@ function Game() {
         }, 0)}
       />
       <div
-        className={`minesweeper-board grid ${borderColor} ${bgColor} w-full h-full justify-between content-between`}
+        className={`minesweeper-board grid ${borderColor} ${bgColor} w-full h-full justify-between content-between select-none`}
         style={{
           gridTemplateColumns: `repeat(${cols}, var(--ms-cell-size))`,
           gridTemplateRows: `repeat(${rows}, var(--ms-cell-size))`
         }}
         onClick={clickBoard}
-        onDoubleClick={doubleClickBoard}
+        onContextMenu={contextMenuBoard}
+        onPointerDown={pointerDownBoard}
+        onPointerUp={pointerUpBoard}
+        onPointerCancel={pointerUpBoard}
+        onPointerLeave={pointerUpBoard}
+        onPointerMove={pointerMoveBoard}
       >
         {cells.map(cellMap)}
       </div>

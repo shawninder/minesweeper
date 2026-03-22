@@ -122,7 +122,7 @@
  * match wins). Cell size = base × reported DPR for consistent physical size.
  */
 .minesweeper-board {
-  --ms-cell-size: 32px;
+  --ms-cell-size: 56px; /* Should match `cellPx` */
 }
 
 @layer base {

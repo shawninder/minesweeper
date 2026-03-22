@@ -5,12 +5,9 @@ export type ControlProps = {
   flagged: number
 }
 
-export default function Controls({ rows, cols, mines, flagged }: ControlProps) {
+export default function Controls({ mines, flagged }: ControlProps) {
   return (
-    <div className='absolute flex flew-row w-full justify-between pointer-events-none'>
-      <span>
-        {rows}x{cols}
-      </span>
+    <div className='absolute flex flew-row w-full justify-end pointer-events-none'>
       <span>
         {mines - flagged} / {mines} 💣
       </span>
