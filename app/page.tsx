@@ -61,7 +61,14 @@ type AvailableSpace = {
 }
 
 const cellPx = 56 // Should match `--ms-cell-size`
-const LONG_PRESS_MS = 300
+
+type ActionType = 'flag' | 'disclose' | 'chord'
+type PointerGesture = {
+  pointerId: number
+  originCellIdx: number
+  originWasDisclosed: boolean
+  discloseArmed: boolean
+}
 
 const defaultAvailableSpace = {
   width: cellPx,
@@ -79,10 +86,8 @@ function makeCells(nbCells: number) {
 
 function Game() {
   const gameRef = useRef<HTMLDivElement>(null)
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const longPressCellIdxRef = useRef<number | null>(null)
-  const suppressNextClickRef = useRef(false)
-  // const chordPointerIdRef = useRef<number | null>(null)
+  const boardRef = useRef<HTMLDivElement>(null)
+  const pointerGestureRef = useRef<PointerGesture | null>(null)
   const suppressContextMenuRef = useRef(false)
 
   const [gameState, setGameState] = useState<GameState>('loading')
@@ -108,25 +113,6 @@ function Game() {
     rowsRef.current = rows
     colsRef.current = cols
   }, [cells, gameState, rows, cols])
-
-  function clearLongPressTimer() {
-    if (longPressTimerRef.current != null) {
-      clearTimeout(longPressTimerRef.current)
-      longPressTimerRef.current = null
-    }
-  }
-
-  function endChordGesture(event: React.PointerEvent<HTMLDivElement>) {
-    clearLongPressTimer()
-    longPressCellIdxRef.current = null
-    // if (chordPointerIdRef.current !== event.pointerId) return
-    // chordPointerIdRef.current = null
-    suppressContextMenuRef.current = false
-    // const t = event.currentTarget
-    // if (t.hasPointerCapture(event.pointerId)) {
-    //   t.releasePointerCapture(event.pointerId)
-    // }
-  }
 
   useEffect(() => {
     const el = gameRef.current
@@ -160,34 +146,97 @@ function Game() {
     return Number.isFinite(idx) ? idx : null
   }
 
+  function cellIdxFromPoint(
+    x: number,
+    y: number,
+    boardElement: HTMLDivElement
+  ): number | null {
+    const el = document.elementFromPoint(x, y)
+    if (!(el instanceof Element)) return null
+    if (!boardElement.contains(el)) return null
+    const cellEl = el.closest('[data-idx]')
+    if (!cellEl || !boardElement.contains(cellEl)) return null
+    const idx = parseInt(cellEl.getAttribute('data-idx') || '', 10)
+    return Number.isFinite(idx) ? idx : null
+  }
+
+  function runAction(
+    currentCells: Cell[],
+    cellIdx: number,
+    action: ActionType
+  ): [Cell[], boolean] {
+    if (action === 'flag') {
+      return [flagCell(currentCells, rowsRef.current, colsRef.current, cellIdx), false]
+    }
+
+    const canGenerateMines = gameStateRef.current === 'ready'
+    if (canGenerateMines) {
+      const withMines = generateMines(currentCells, cellIdx, mines)
+      const withNumbers = numberCells(withMines, rowsRef.current, colsRef.current)
+      setGameState('playing')
+      return [discloseCell(withNumbers, rowsRef.current, colsRef.current, cellIdx), true]
+    }
+
+    return [discloseCell(currentCells, rowsRef.current, colsRef.current, cellIdx), true]
+  }
+
+  function resolveAndApplyAction(cellIdx: number, discloseArmed: boolean) {
+    if (gameStateRef.current === 'won' || gameStateRef.current === 'lost') {
+      newGame()
+      return
+    }
+
+    const cell = cellsRef.current[cellIdx]
+    const action: ActionType = cell.isDisclosed
+      ? 'chord'
+      : discloseArmed
+        ? 'disclose'
+        : 'flag'
+    const [newCells, disclosing] = runAction(cellsRef.current, cellIdx, action)
+    setCells(newCells)
+    checkForEnd(newCells, cellIdx, disclosing)
+  }
+
+  function endPointerGesture(
+    event: React.PointerEvent<HTMLDivElement>,
+    shouldResolve: boolean
+  ) {
+    const gesture = pointerGestureRef.current
+    if (!gesture || gesture.pointerId !== event.pointerId) {
+      return
+    }
+    pointerGestureRef.current = null
+    suppressContextMenuRef.current = false
+    const target = event.currentTarget
+    if (target.hasPointerCapture(event.pointerId)) {
+      target.releasePointerCapture(event.pointerId)
+    }
+    if (shouldResolve) {
+      resolveAndApplyAction(gesture.originCellIdx, gesture.discloseArmed)
+    }
+  }
+
   const pointerDownBoard: PointerEventHandler<HTMLDivElement> = (event) => {
     if (event.button !== 0) return
     const cellIdx = cellIdxFromPointerEvent(event)
     if (cellIdx == null) return
-    // chordPointerIdRef.current = event.pointerId
+    const cell = cellsRef.current[cellIdx]
+    pointerGestureRef.current = {
+      pointerId: event.pointerId,
+      originCellIdx: cellIdx,
+      originWasDisclosed: cell.isDisclosed,
+      discloseArmed: false
+    }
     suppressContextMenuRef.current = true
-    // event.currentTarget.setPointerCapture(event.pointerId)
-    longPressCellIdxRef.current = cellIdx
-    clearLongPressTimer()
-    longPressTimerRef.current = setTimeout(() => {
-      longPressTimerRef.current = null
-      if (gameStateRef.current !== 'playing') return
-      const idx = longPressCellIdxRef.current
-      if (idx == null) return
-      suppressNextClickRef.current = true
-      const newCells = discloseCell(
-        cellsRef.current,
-        rowsRef.current,
-        colsRef.current,
-        idx
-      )
-      setCells(newCells)
-      checkForEnd(newCells, idx)
-    }, LONG_PRESS_MS)
+    event.currentTarget.setPointerCapture(event.pointerId)
   }
 
   const pointerUpBoard: PointerEventHandler<HTMLDivElement> = (event) => {
-    endChordGesture(event)
+    endPointerGesture(event, true)
+  }
+
+  const pointerCancelBoard: PointerEventHandler<HTMLDivElement> = (event) => {
+    endPointerGesture(event, false)
   }
 
   const contextMenuBoard: MouseEventHandler<HTMLDivElement> = (event) => {
@@ -197,50 +246,36 @@ function Game() {
   }
 
   const pointerMoveBoard: PointerEventHandler<HTMLDivElement> = (event) => {
-    if (longPressCellIdxRef.current == null) return
-    const cellIdx = cellIdxFromPointerEvent(event)
-    if (cellIdx !== longPressCellIdxRef.current) {
-      clearLongPressTimer()
-      longPressCellIdxRef.current = null
-    }
-  }
-
-  const clickBoard: MouseEventHandler<HTMLDivElement> = function clickBoard(
-    event
-  ) {
-    if (suppressNextClickRef.current) {
-      suppressNextClickRef.current = false
+    const gesture = pointerGestureRef.current
+    if (!gesture || gesture.pointerId !== event.pointerId || gesture.discloseArmed) {
       return
     }
-    if (gameState === 'won' || gameState === 'lost') {
-      return newGame(event)
+    if (gesture.originWasDisclosed) {
+      return
     }
-    const target = getTarget(event)
-    const cellIdx = parseInt(target.dataset.idx || '', 10)
 
-    const isRightClick = event.type === 'contextmenu' || event.button === 2
-    const isCtrlClick = event.ctrlKey
-    const isShiftClick = event.shiftKey
-    const isMetaClick = event.metaKey
-    const isSpecialClick =
-      isRightClick || isCtrlClick || isShiftClick || isMetaClick
+    const boardElement = boardRef.current
+    if (!boardElement) return
+    const hoveredCellIdx = cellIdxFromPoint(
+      event.clientX,
+      event.clientY,
+      boardElement
+    )
 
-    let newCells
-    if (gameState === 'ready') {
-      const withMines = generateMines(cells, cellIdx, mines)
-      const withNumbers = numberCells(withMines, rows, cols)
-      setGameState('playing')
-      newCells = discloseCell(withNumbers, rows, cols, cellIdx)
-    } else {
-      const { isDisclosed } = cells[cellIdx]
-      newCells = isSpecialClick
-        ? discloseCell(cells, rows, cols, cellIdx)
-        : isDisclosed
-          ? discloseCell(cells, rows, cols, cellIdx)
-          : flagCell(cells, rows, cols, cellIdx)
+    if (hoveredCellIdx == null) {
+      gesture.discloseArmed = true
+      return
     }
-    setCells(newCells)
-    checkForEnd(newCells, cellIdx, isSpecialClick)
+
+    const neighbors = getNeighbors(
+      cellsRef.current,
+      rowsRef.current,
+      colsRef.current,
+      gesture.originCellIdx
+    )
+    if (neighbors.includes(hoveredCellIdx)) {
+      gesture.discloseArmed = true
+    }
   }
 
   function checkForEnd(
@@ -270,14 +305,6 @@ function Game() {
     }
   }
 
-  function getTarget(event: React.MouseEvent<HTMLDivElement, MouseEvent>) {
-    const target = event.target as HTMLButtonElement
-    if (!target) {
-      throw Error("Can't find click target")
-    }
-    return target
-  }
-
   function lose() {
     setGameState('lost')
   }
@@ -285,7 +312,7 @@ function Game() {
     setGameState('won')
   }
 
-  const newGame: MouseEventHandler<HTMLDivElement> = function newGame() {
+  function newGame() {
     setCells(initialCells)
     setGameState('ready')
   }
@@ -307,17 +334,16 @@ function Game() {
         }, 0)}
       />
       <div
+        ref={boardRef}
         className={`minesweeper-board grid ${borderColor} ${bgColor} w-full h-full justify-between content-between select-none`}
         style={{
           gridTemplateColumns: `repeat(${cols}, var(--ms-cell-size))`,
           gridTemplateRows: `repeat(${rows}, var(--ms-cell-size))`
         }}
-        onClick={clickBoard}
         onContextMenu={contextMenuBoard}
         onPointerDown={pointerDownBoard}
         onPointerUp={pointerUpBoard}
-        onPointerCancel={pointerUpBoard}
-        onPointerLeave={pointerUpBoard}
+        onPointerCancel={pointerCancelBoard}
         onPointerMove={pointerMoveBoard}
       >
         {cells.map(cellMap)}
