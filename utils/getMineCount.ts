@@ -1,14 +1,9 @@
 export default function getMineCount(cellCount: number) {
-  const a = 0.000467
-  const b = -0.0576
-  const c = 11.61
+  const MINE_CURVE_A = 0.000467
+  const MINE_CURVE_B = -0.0576
+  const MINE_CURVE_C = 11.61
 
-  return Math.round(a * cellCount * cellCount + b * cellCount + c)
+  return Math.round(
+    MINE_CURVE_A * cellCount * cellCount + MINE_CURVE_B * cellCount + MINE_CURVE_C
+  )
 }
-
-// export default function getMineCount (n: number) {
-// 	const a = 0.0615
-// 	const b = 0.00102
-
-// 	return Math.round(n * (a + b * Math.log(n)))
-// }
