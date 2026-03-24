@@ -20,9 +20,9 @@ import {
   generateMines,
   getNeighbors,
   makeCells,
-  numberCells
+  numberCells,
+  getMineCount
 } from '@/lib/gameLogic'
-import getMineCount from '@/utils/getMineCount'
 
 const CELL_NUMBER_CLASSES = [
   '',
