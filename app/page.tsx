@@ -11,6 +11,15 @@ import { toast } from 'sonner'
 import Controls from '@/components/Controls'
 import { Toaster } from '@/components/ui/sonner'
 import {
+  BACKGROUND_CLASS_BY_GAME_STATE,
+  BORDER_CLASS_BY_GAME_STATE,
+  CELL_BACKGROUND_CLASS_BY_STATE,
+  CELL_NUMBER_CLASSES,
+  TEXT_SHADOW_CLASSES,
+  TEXT_SHADOW_FLAG_CLASS,
+  TEXT_SHADOW_MINE_CLASS
+} from '@/lib/colors'
+import {
   type ActionType,
   type Cell,
   type GameState,
@@ -23,48 +32,6 @@ import {
   numberCells,
   getMineCount
 } from '@/lib/gameLogic'
-
-const CELL_NUMBER_CLASSES = [
-  '',
-  'text-blue-500 dark:text-blue-300',
-  'text-emerald-500 dark:text-emerald-300',
-  'text-red-500 dark:text-red-300',
-  'text-indigo-500 dark:text-indigo-300',
-  'text-amber-500 dark:text-amber-300',
-  'text-teal-500 dark:text-teal-300',
-  'text-fuchsia-500 dark:text-fuchsia-300',
-  'text-slate-300 dark:text-slate-200'
-]
-
-const TEXT_SHADOW_MINE_CLASS = 'text-shadow-gray-100 dark:text-shadow-gray-900'
-const TEXT_SHADOW_FLAG_CLASS = 'text-shadow-gray-100 dark:text-shadow-gray-900'
-const TEXT_SHADOW_CLASSES = [
-  '',
-  'text-shadow-blue-500 dark:text-shadow-blue-300',
-  'text-shadow-emerald-500 dark:text-shadow-emerald-300',
-  'text-shadow-red-500 dark:text-shadow-red-300',
-  'text-shadow-indigo-500 dark:text-shadow-indigo-300',
-  'text-shadow-amber-500 dark:text-shadow-amber-300',
-  'text-shadow-teal-500 dark:text-shadow-teal-300',
-  'text-shadow-fuchsia-500 dark:text-shadow-fuchsia-300',
-  'text-shadow-slate-300 dark:text-shadow-slate-200'
-]
-
-const BORDER_CLASS_BY_GAME_STATE: Record<GameState, string> = {
-  loading: '[&>button]:border-blue-500 dark:[&>button]:border-blue-500',
-  ready: '[&>button]:border-blue-400 dark:[&>button]:border-blue-600',
-  playing: '[&>button]:border-gray-400 dark:[&>button]:border-gray-600',
-  lost: '[&>button]:border-red-400 dark:[&>button]:border-red-600',
-  won: '[&>button]:border-green-400 dark:[&>button]:border-green-600'
-}
-
-const BACKGROUND_CLASS_BY_GAME_STATE: Record<GameState, string> = {
-  loading: 'bg-blue-500 dark:bg-blue-500',
-  ready: 'bg-blue-400 dark:bg-blue-600',
-  playing: 'bg-gray-400 dark:bg-gray-600',
-  lost: 'bg-red-400 dark:bg-red-600',
-  won: 'bg-green-400 dark:bg-green-600'
-}
 
 type AvailableSpace = {
   width: number
@@ -375,13 +342,14 @@ export function renderCell(
   { isMine, adjacentMineCount, isDisclosed, isFlagged }: Cell,
   index: number
 ) {
+  const { mine, number, flag, undisclosed } = CELL_BACKGROUND_CLASS_BY_STATE
   const backgroundClass = isDisclosed
     ? isMine
-      ? 'bg-red-400 dark:bg-red-600'
-      : 'bg-gray-100 dark:bg-gray-800'
+      ? mine
+      : number
     : isFlagged
-      ? 'bg-red-100 dark:bg-red-900'
-      : 'bg-gray-300 dark:bg-gray-700'
+      ? flag
+      : undisclosed
 
   const textClass = isDisclosed
     ? adjacentMineCount
