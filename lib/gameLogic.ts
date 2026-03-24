@@ -7,8 +7,6 @@ export type Cell = {
   isFlagged: boolean
 }
 
-export type ActionType = 'flag' | 'disclose' | 'chord'
-
 export function makeCells(cellCount: number): Cell[] {
   return Array.from({ length: cellCount }).map(() => ({
     isMine: false,

@@ -20,10 +20,9 @@ import {
   TEXT_SHADOW_MINE_CLASS
 } from '@/lib/colors'
 import {
-  type ActionType,
   type Cell,
   type GameState,
-  discloseCell,
+  discloseCell as discloseOrChordCell,
   evaluateGameState,
   flagCell,
   generateMines,
@@ -41,6 +40,7 @@ type AvailableSpace = {
 type PointerGesture = {
   pointerId: number
   originCellIndex: number
+  originNeighbors: number[]
   originWasDisclosed: boolean
   discloseArmed: boolean
 }
@@ -57,7 +57,6 @@ type GameModel = {
 type GameAction =
   | { type: 'BOARD_RESIZED'; width: number; height: number }
   | { type: 'RESOLVE_ACTION'; cellIndex: number; discloseArmed: boolean }
-  | { type: 'RESET_GAME' }
 
 const CELL_SIZE_PX = 56 // Should match `--ms-cell-size`
 
@@ -79,83 +78,86 @@ const initialState: GameModel = {
 }
 
 function gameReducer(state: GameModel, action: GameAction): GameModel {
-  if (action.type === 'BOARD_RESIZED') {
-    if (state.gameState !== 'loading' && state.gameState !== 'ready') {
-      return state
+  switch (action.type) {
+    case 'BOARD_RESIZED': {
+      if (state.gameState !== 'loading' && state.gameState !== 'ready') {
+        return state
+      }
+
+      const rows = Math.floor(action.height / CELL_SIZE_PX)
+      const cols = Math.floor(action.width / CELL_SIZE_PX)
+      const cellCount = rows * cols
+
+      return {
+        ...state,
+        gameState: 'ready',
+        availableSpace: { width: action.width, height: action.height },
+        rows,
+        cols,
+        mines: getMineCount(cellCount),
+        cells: makeCells(cellCount)
+      }
     }
 
-    const rows = Math.floor(action.height / CELL_SIZE_PX)
-    const cols = Math.floor(action.width / CELL_SIZE_PX)
-    const cellCount = rows * cols
+    case 'RESOLVE_ACTION': {
+      const originCell = state.cells[action.cellIndex]
 
-    return {
-      ...state,
-      gameState: 'ready',
-      availableSpace: { width: action.width, height: action.height },
-      rows,
-      cols,
-      mines: getMineCount(cellCount),
-      cells: makeCells(cellCount)
-    }
-  }
+      if (state.gameState === 'won' || state.gameState === 'lost') {
+        // RESET
+        const { rows, cols } = state
+        return {
+          ...state,
+          gameState: 'ready',
+          cells: makeCells(rows * cols)
+        }
+      }
 
-  if (action.type === 'RESET_GAME') {
-    const cellCount = state.rows * state.cols
-    return {
-      ...state,
-      gameState: 'ready',
-      cells: makeCells(cellCount)
-    }
-  }
-
-  if (state.gameState === 'won' || state.gameState === 'lost') {
-    const cellCount = state.rows * state.cols
-    return {
-      ...state,
-      gameState: 'ready',
-      cells: makeCells(cellCount)
-    }
-  }
-
-  const originCell = state.cells[action.cellIndex]
-  const actionType: ActionType = originCell.isDisclosed
-    ? 'chord'
-    : action.discloseArmed
-      ? 'disclose'
-      : 'flag'
-
-  if (actionType === 'flag') {
-    const nextCells = flagCell(state.cells, action.cellIndex)
-    const nextGameState = evaluateGameState(nextCells, action.cellIndex, false)
-
-    return {
-      ...state,
-      gameState: nextGameState,
-      cells: nextCells
-    }
-  }
-
-  const cellsBeforeDisclose =
-    state.gameState === 'ready'
-      ? numberCells(
-          generateMines(state.cells, action.cellIndex, state.mines),
-          state.rows,
-          state.cols
+      const cellsBeforeDisclose =
+        state.gameState === 'ready'
+          ? numberCells(
+              generateMines(state.cells, action.cellIndex, state.mines),
+              state.rows,
+              state.cols
+            )
+          : state.cells
+      if (
+        !originCell.isDisclosed &&
+        !action.discloseArmed &&
+        state.gameState !== 'ready'
+      ) {
+        // Flag
+        const nextCells = flagCell(state.cells, action.cellIndex)
+        const nextGameState = evaluateGameState(
+          nextCells,
+          action.cellIndex,
+          false
         )
-      : state.cells
 
-  const nextCells = discloseCell(
-    cellsBeforeDisclose,
-    state.rows,
-    state.cols,
-    action.cellIndex
-  )
-  const nextGameState = evaluateGameState(nextCells, action.cellIndex, true)
+        return {
+          ...state,
+          gameState: nextGameState,
+          cells: nextCells
+        }
+      }
 
-  return {
-    ...state,
-    gameState: nextGameState,
-    cells: nextCells
+      const nextCells = discloseOrChordCell(
+        cellsBeforeDisclose,
+        state.rows,
+        state.cols,
+        action.cellIndex
+      )
+      const nextGameState = evaluateGameState(nextCells, action.cellIndex, true)
+
+      return {
+        ...state,
+        gameState: nextGameState,
+        cells: nextCells
+      }
+    }
+
+    default: {
+      throw new Error('Unexpected action type')
+    }
   }
 }
 
@@ -184,8 +186,15 @@ function Game() {
   }, [])
 
   useEffect(() => {
-    if (state.gameState === 'lost') {
-      toast('You Lose')
+    switch (state.gameState) {
+      case 'lost':
+        toast('You Lost')
+        break
+      case 'won':
+        toast('You Won!')
+        break
+      default:
+        break
     }
   }, [state.gameState])
 
@@ -221,10 +230,6 @@ function Game() {
     return Number.isFinite(index) ? index : null
   }
 
-  function resolveAndApplyAction(cellIndex: number, discloseArmed: boolean) {
-    dispatch({ type: 'RESOLVE_ACTION', cellIndex, discloseArmed })
-  }
-
   function endPointerGesture(
     event: React.PointerEvent<HTMLDivElement>,
     shouldResolve: boolean
@@ -243,7 +248,11 @@ function Game() {
     }
 
     if (shouldResolve) {
-      resolveAndApplyAction(gesture.originCellIndex, gesture.discloseArmed)
+      dispatch({
+        type: 'RESOLVE_ACTION',
+        cellIndex: gesture.originCellIndex,
+        discloseArmed: gesture.discloseArmed
+      })
     }
   }
 
@@ -253,11 +262,17 @@ function Game() {
     const cellIndex = cellIndexFromPointerEvent(event)
     if (cellIndex == null) return
 
-    const cell = state.cells[cellIndex]
+    const { isDisclosed } = state.cells[cellIndex]
     pointerGestureRef.current = {
       pointerId: event.pointerId,
       originCellIndex: cellIndex,
-      originWasDisclosed: cell.isDisclosed,
+      originNeighbors: getNeighbors(
+        state.cells,
+        state.rows,
+        state.cols,
+        cellIndex
+      ),
+      originWasDisclosed: isDisclosed,
       discloseArmed: false
     }
     suppressContextMenuRef.current = true
@@ -304,13 +319,7 @@ function Game() {
       return
     }
 
-    const neighbors = getNeighbors(
-      state.cells,
-      state.rows,
-      state.cols,
-      gesture.originCellIndex
-    )
-    if (neighbors.includes(hoveredCellIndex)) {
+    if (gesture.originNeighbors.includes(hoveredCellIndex)) {
       gesture.discloseArmed = true
     }
   }
