@@ -163,14 +163,23 @@ export function getNeighbors(
 
 export function generateMines(
   cells: Cell[],
+  rows: number,
+  cols: number,
   safeCellIndex: number,
   mineCount: number
 ): Cell[] {
+  const nbMineless = cells.length - mineCount
+  const neighbors = getNeighbors(cells, rows, cols, safeCellIndex)
+
+  const safeCells = nbMineless < 9
+    ? [safeCellIndex]
+    : neighbors.concat(safeCellIndex)
+
   const nextCells = cells.map((cell) => ({ ...cell }))
 
   shuffleArray(
     Array.from(cells).reduce<number[]>((indices, _, index) => {
-      if (index !== safeCellIndex) {
+      if (!safeCells.includes(index)) {
         indices.push(index)
       }
       return indices

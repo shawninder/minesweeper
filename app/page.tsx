@@ -101,10 +101,9 @@ function gameReducer(state: GameModel, action: GameAction): GameModel {
 
     case 'RESOLVE_ACTION': {
       const originCell = state.cells[action.cellIndex]
-
+      const { rows, cols } = state
       if (state.gameState === 'won' || state.gameState === 'lost') {
         // RESET
-        const { rows, cols } = state
         return {
           ...state,
           gameState: 'ready',
@@ -115,7 +114,13 @@ function gameReducer(state: GameModel, action: GameAction): GameModel {
       const cellsBeforeDisclose =
         state.gameState === 'ready'
           ? numberCells(
-              generateMines(state.cells, action.cellIndex, state.mines),
+              generateMines(
+                state.cells,
+                rows,
+                cols,
+                action.cellIndex,
+                state.mines
+              ),
               state.rows,
               state.cols
             )
