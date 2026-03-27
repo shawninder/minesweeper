@@ -334,7 +334,7 @@ function Game() {
       <Controls mines={state.mines} flagged={flaggedCount} />
       <div
         ref={boardRef}
-        className={`minesweeper-board grid ${BORDER_CLASS_BY_GAME_STATE[state.gameState]} ${BACKGROUND_CLASS_BY_GAME_STATE[state.gameState]} w-full h-full justify-between content-between select-none font-bold`}
+        className={`minesweeper-board grid ${BORDER_CLASS_BY_GAME_STATE[state.gameState]} ${BACKGROUND_CLASS_BY_GAME_STATE[state.gameState]} w-full h-full justify-center content-center select-none font-bold`}
         style={{
           gridTemplateColumns: `repeat(${state.cols}, var(--ms-cell-size))`,
           gridTemplateRows: `repeat(${state.rows}, var(--ms-cell-size))`
