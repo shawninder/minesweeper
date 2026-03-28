@@ -116,15 +116,6 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
-/*
- * Approximate window.devicePixelRatio: CSS cannot read DPR directly, so we
- * ladder min-resolution / -webkit-min-device-pixel-ratio (ascending — last
- * match wins). Cell size = base × reported DPR for consistent physical size.
- */
-.minesweeper-board {
-  --ms-cell-size: 56px; /* Should match `cellPx` */
-}
-
 @layer base {
   * {
     @apply border-border outline-ring/50;

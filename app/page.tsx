@@ -52,21 +52,22 @@ type GameModel = {
   cols: number
   mines: number
   cells: Cell[]
+  cellDimensions: CellDimensions
 }
 
 type GameAction =
   | { type: 'BOARD_RESIZED'; width: number; height: number }
   | { type: 'RESOLVE_ACTION'; cellIndex: number; discloseArmed: boolean }
 
-const CELL_SIZE_PX = 56 // Should match `--ms-cell-size`
+const MIN_CELL_SIZE_PX = 56
 
 const defaultAvailableSpace: AvailableSpace = {
-  width: CELL_SIZE_PX,
-  height: CELL_SIZE_PX
+  width: MIN_CELL_SIZE_PX,
+  height: MIN_CELL_SIZE_PX
 }
 
-const initialRows = Math.floor(defaultAvailableSpace.height / CELL_SIZE_PX)
-const initialCols = Math.floor(defaultAvailableSpace.width / CELL_SIZE_PX)
+const initialRows = Math.floor(defaultAvailableSpace.height / MIN_CELL_SIZE_PX)
+const initialCols = Math.floor(defaultAvailableSpace.width / MIN_CELL_SIZE_PX)
 
 const initialState: GameModel = {
   gameState: 'loading',
@@ -74,7 +75,30 @@ const initialState: GameModel = {
   rows: initialRows,
   cols: initialCols,
   mines: getMineCount(initialRows * initialCols),
-  cells: makeCells(initialRows * initialCols)
+  cells: makeCells(initialRows * initialCols),
+  cellDimensions: getCellDimensions(defaultAvailableSpace, {
+    rows: initialRows,
+    cols: initialCols
+  })
+}
+
+type CellDimensions = {
+  width: number
+  height: number
+}
+
+type GridSize = {
+  rows: number
+  cols: number
+}
+function getCellDimensions(
+  { width, height }: CellDimensions,
+  { rows, cols }: GridSize
+): CellDimensions {
+  return {
+    width: width / cols,
+    height: height / rows
+  }
 }
 
 function gameReducer(state: GameModel, action: GameAction): GameModel {
@@ -84,9 +108,16 @@ function gameReducer(state: GameModel, action: GameAction): GameModel {
         return state
       }
 
-      const rows = Math.floor(action.height / CELL_SIZE_PX)
-      const cols = Math.floor(action.width / CELL_SIZE_PX)
+      const { width, height } = action
+
+      const rows = Math.floor(height / MIN_CELL_SIZE_PX)
+      const cols = Math.floor(width / MIN_CELL_SIZE_PX)
       const cellCount = rows * cols
+
+      const cellDimensions = getCellDimensions(
+        { width, height },
+        { rows, cols }
+      )
 
       return {
         ...state,
@@ -95,7 +126,8 @@ function gameReducer(state: GameModel, action: GameAction): GameModel {
         rows,
         cols,
         mines: getMineCount(cellCount),
-        cells: makeCells(cellCount)
+        cells: makeCells(cellCount),
+        cellDimensions
       }
     }
 
@@ -336,8 +368,8 @@ function Game() {
         ref={boardRef}
         className={`minesweeper-board grid ${BORDER_CLASS_BY_GAME_STATE[state.gameState]} ${BACKGROUND_CLASS_BY_GAME_STATE[state.gameState]} w-full h-full justify-center content-center select-none font-bold`}
         style={{
-          gridTemplateColumns: `repeat(${state.cols}, var(--ms-cell-size))`,
-          gridTemplateRows: `repeat(${state.rows}, var(--ms-cell-size))`
+          gridTemplateColumns: `repeat(${state.cols}, ${state.cellDimensions.width}px)`,
+          gridTemplateRows: `repeat(${state.rows}, ${state.cellDimensions.height}px)`
         }}
         onContextMenu={onBoardContextMenu}
         onPointerDown={onBoardPointerDown}
