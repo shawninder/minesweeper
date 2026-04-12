@@ -1,12 +1,6 @@
 'use client'
 
-import {
-  type MouseEventHandler,
-  type PointerEventHandler,
-  useEffect,
-  useReducer,
-  useRef
-} from 'react'
+import { useEffect, useReducer, useRef } from 'react'
 import { toast } from 'sonner'
 import Controls from '@/components/Controls'
 import { Toaster } from '@/components/ui/sonner'
@@ -26,7 +20,6 @@ import {
   evaluateGameState,
   flagCell,
   generateMines,
-  getNeighbors,
   makeCells,
   numberCells,
   getMineCount
@@ -35,14 +28,6 @@ import {
 type AvailableSpace = {
   width: number
   height: number
-}
-
-type PointerGesture = {
-  pointerId: number
-  originCellIndex: number
-  originNeighbors: number[]
-  originWasDisclosed: boolean
-  discloseArmed: boolean
 }
 
 type GameModel = {
@@ -58,8 +43,11 @@ type GameModel = {
 type GameAction =
   | { type: 'BOARD_RESIZED'; width: number; height: number }
   | { type: 'RESOLVE_ACTION'; cellIndex: number; discloseArmed: boolean }
+  | { type: 'CELL_LONG_PRESS'; cellIndex: number }
+  | { type: 'CELL_PRESS'; cellIndex: number }
 
 const MIN_CELL_SIZE_PX = 56
+const LONG_PRESS_DURATION_MS = 500
 
 const defaultAvailableSpace: AvailableSpace = {
   width: MIN_CELL_SIZE_PX,
@@ -131,8 +119,26 @@ function gameReducer(state: GameModel, action: GameAction): GameModel {
       }
     }
 
-    case 'RESOLVE_ACTION': {
-      const originCell = state.cells[action.cellIndex]
+    case 'CELL_LONG_PRESS': {
+      if (state.gameState !== 'playing') {
+        return state
+      }
+      const nextCells = discloseOrChordCell(
+        state.cells,
+        state.rows,
+        state.cols,
+        action.cellIndex
+      )
+      const nextGameState = evaluateGameState(nextCells, action.cellIndex, true)
+
+      return {
+        ...state,
+        gameState: nextGameState,
+        cells: nextCells
+      }
+    }
+
+    case 'CELL_PRESS': {
       const { rows, cols } = state
       if (state.gameState === 'won' || state.gameState === 'lost') {
         // RESET
@@ -141,6 +147,10 @@ function gameReducer(state: GameModel, action: GameAction): GameModel {
           gameState: 'ready',
           cells: makeCells(rows * cols)
         }
+      }
+
+      if (state.gameState !== 'ready' && state.gameState !== 'playing') {
+        return state
       }
 
       const cellsBeforeDisclose =
@@ -157,13 +167,11 @@ function gameReducer(state: GameModel, action: GameAction): GameModel {
               state.cols
             )
           : state.cells
-      if (
-        !originCell.isDisclosed &&
-        !action.discloseArmed &&
-        state.gameState !== 'ready'
-      ) {
+
+      const cell = cellsBeforeDisclose[action.cellIndex]
+      if (!cell.isDisclosed && state.gameState === 'playing') {
         // Flag
-        const nextCells = flagCell(state.cells, action.cellIndex)
+        const nextCells = flagCell(cellsBeforeDisclose, action.cellIndex)
         const nextGameState = evaluateGameState(
           nextCells,
           action.cellIndex,
@@ -205,8 +213,7 @@ export default function Page() {
 function Game() {
   const gameRef = useRef<HTMLDivElement>(null)
   const boardRef = useRef<HTMLDivElement>(null)
-  const pointerGestureRef = useRef<PointerGesture | null>(null)
-  const suppressContextMenuRef = useRef(false)
+  const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const [state, dispatch] = useReducer(gameReducer, initialState)
 
   useEffect(() => {
@@ -242,128 +249,81 @@ function Game() {
     return count
   }, 0)
 
-  function cellIndexFromPointerEvent(event: {
-    target: EventTarget | null
-  }): number | null {
-    const target = event.target
-    if (!(target instanceof Element)) return null
-    const element = target.closest('[data-idx]')
-    if (!element) return null
-    const index = parseInt(element.getAttribute('data-idx') || '', 10)
-    return Number.isFinite(index) ? index : null
+  function clickCell(cellIndex: number) {
+    return () => {
+      dispatch({ type: 'CELL_PRESS', cellIndex })
+    }
   }
 
-  function cellIndexFromPoint(
-    x: number,
-    y: number,
-    boardElement: HTMLDivElement
-  ): number | null {
-    const element = document.elementFromPoint(x, y)
-    if (!(element instanceof Element)) return null
-    if (!boardElement.contains(element)) return null
-    const cellElement = element.closest('[data-idx]')
-    if (!cellElement || !boardElement.contains(cellElement)) return null
-    const index = parseInt(cellElement.getAttribute('data-idx') || '', 10)
-    return Number.isFinite(index) ? index : null
+  function pointerDown(cellIndex: number) {
+    return () => {
+      if (longPressTimeoutRef.current) {
+        clearTimeout(longPressTimeoutRef.current)
+      }
+      longPressTimeoutRef.current = setTimeout(() => {
+        dispatch({ type: 'CELL_LONG_PRESS', cellIndex })
+      }, LONG_PRESS_DURATION_MS)
+    }
   }
 
-  function endPointerGesture(
-    event: React.PointerEvent<HTMLDivElement>,
-    shouldResolve: boolean
+  function pointerUp() {
+    return () => {
+      if (longPressTimeoutRef.current) {
+        clearTimeout(longPressTimeoutRef.current)
+      }
+    }
+  }
+
+  function renderCell(
+    { isMine, adjacentMineCount, isDisclosed, isFlagged }: Cell,
+    index: number
   ) {
-    const gesture = pointerGestureRef.current
-    if (!gesture || gesture.pointerId !== event.pointerId) {
-      return
-    }
+    const { mine, number, flag, undisclosed } = CELL_BACKGROUND_CLASS_BY_STATE
+    const backgroundClass = isDisclosed
+      ? isMine
+        ? mine
+        : number
+      : isFlagged
+        ? flag
+        : undisclosed
 
-    pointerGestureRef.current = null
-    suppressContextMenuRef.current = false
+    const textClass = isDisclosed
+      ? adjacentMineCount
+        ? CELL_NUMBER_CLASSES[adjacentMineCount]
+        : ''
+      : ''
 
-    const target = event.currentTarget
-    if (target.hasPointerCapture(event.pointerId)) {
-      target.releasePointerCapture(event.pointerId)
-    }
+    const textShadowColorClass = isDisclosed
+      ? isMine
+        ? TEXT_SHADOW_MINE_CLASS
+        : TEXT_SHADOW_CLASSES[adjacentMineCount]
+      : TEXT_SHADOW_FLAG_CLASS
 
-    if (shouldResolve) {
-      dispatch({
-        type: 'RESOLVE_ACTION',
-        cellIndex: gesture.originCellIndex,
-        discloseArmed: gesture.discloseArmed
-      })
-    }
-  }
+    const textShadowSizeClass =
+      isDisclosed && !isMine ? 'text-shadow-none' : 'text-shadow-lg'
 
-  const onBoardPointerDown: PointerEventHandler<HTMLDivElement> = (event) => {
-    if (event.button !== 0) return
-
-    const cellIndex = cellIndexFromPointerEvent(event)
-    if (cellIndex == null) return
-
-    const { isDisclosed } = state.cells[cellIndex]
-    pointerGestureRef.current = {
-      pointerId: event.pointerId,
-      originCellIndex: cellIndex,
-      originNeighbors: getNeighbors(
-        state.cells,
-        state.rows,
-        state.cols,
-        cellIndex
-      ),
-      originWasDisclosed: isDisclosed,
-      discloseArmed: false
-    }
-    suppressContextMenuRef.current = true
-    event.currentTarget.setPointerCapture(event.pointerId)
-  }
-
-  const onBoardPointerUp: PointerEventHandler<HTMLDivElement> = (event) => {
-    endPointerGesture(event, true)
-  }
-
-  const onBoardPointerCancel: PointerEventHandler<HTMLDivElement> = (event) => {
-    endPointerGesture(event, false)
-  }
-
-  const onBoardContextMenu: MouseEventHandler<HTMLDivElement> = (event) => {
-    if (suppressContextMenuRef.current) {
-      event.preventDefault()
-    }
-  }
-
-  const onBoardPointerMove: PointerEventHandler<HTMLDivElement> = (event) => {
-    const gesture = pointerGestureRef.current
-    if (
-      !gesture ||
-      gesture.pointerId !== event.pointerId ||
-      gesture.discloseArmed
-    ) {
-      return
-    }
-    if (gesture.originWasDisclosed) {
-      return
-    }
-
-    const boardElement = boardRef.current
-    if (!boardElement) return
-
-    const hoveredCellIndex = cellIndexFromPoint(
-      event.clientX,
-      event.clientY,
-      boardElement
+    return (
+      <button
+        key={index}
+        className={`border ${backgroundClass} ${textClass} w-full h-full aspect-square text-xs ${textShadowSizeClass} ${textShadowColorClass}`}
+        data-idx={index}
+        onClick={clickCell(index)}
+        onPointerDown={pointerDown(index)}
+        onPointerUp={pointerUp()}
+      >
+        {isDisclosed ? (isMine ? '💣' : adjacentMineCount || '') : ''}
+        {isFlagged ? '🚩' : ''}
+      </button>
     )
-    if (hoveredCellIndex == null) {
-      gesture.discloseArmed = true
-      return
-    }
-
-    if (gesture.originNeighbors.includes(hoveredCellIndex)) {
-      gesture.discloseArmed = true
-    }
   }
 
   return (
     <div className='w-full h-full' ref={gameRef}>
-      <Controls mines={state.mines} flagged={flaggedCount} />
+      <Controls
+        mines={state.mines}
+        flagged={flaggedCount}
+        state={state.gameState}
+      />
       <div
         ref={boardRef}
         className={`minesweeper-board grid ${BORDER_CLASS_BY_GAME_STATE[state.gameState]} ${BACKGROUND_CLASS_BY_GAME_STATE[state.gameState]} w-full h-full justify-center content-center select-none font-bold`}
@@ -371,55 +331,10 @@ function Game() {
           gridTemplateColumns: `repeat(${state.cols}, ${state.cellDimensions.width}px)`,
           gridTemplateRows: `repeat(${state.rows}, ${state.cellDimensions.height}px)`
         }}
-        onContextMenu={onBoardContextMenu}
-        onPointerDown={onBoardPointerDown}
-        onPointerUp={onBoardPointerUp}
-        onPointerCancel={onBoardPointerCancel}
-        onPointerMove={onBoardPointerMove}
       >
         {state.cells.map(renderCell)}
       </div>
       <Toaster />
     </div>
-  )
-}
-
-export function renderCell(
-  { isMine, adjacentMineCount, isDisclosed, isFlagged }: Cell,
-  index: number
-) {
-  const { mine, number, flag, undisclosed } = CELL_BACKGROUND_CLASS_BY_STATE
-  const backgroundClass = isDisclosed
-    ? isMine
-      ? mine
-      : number
-    : isFlagged
-      ? flag
-      : undisclosed
-
-  const textClass = isDisclosed
-    ? adjacentMineCount
-      ? CELL_NUMBER_CLASSES[adjacentMineCount]
-      : ''
-    : ''
-
-  const textShadowColorClass = isDisclosed
-    ? isMine
-      ? TEXT_SHADOW_MINE_CLASS
-      : TEXT_SHADOW_CLASSES[adjacentMineCount]
-    : TEXT_SHADOW_FLAG_CLASS
-
-  const textShadowSizeClass =
-    isDisclosed && !isMine ? 'text-shadow-none' : 'text-shadow-lg'
-
-  return (
-    <button
-      key={index}
-      className={`border ${backgroundClass} ${textClass} w-full h-full aspect-square text-xs ${textShadowSizeClass} ${textShadowColorClass}`}
-      data-idx={index}
-    >
-      {isDisclosed ? (isMine ? '💣' : adjacentMineCount || '') : ''}
-      {isFlagged ? '🚩' : ''}
-    </button>
   )
 }
