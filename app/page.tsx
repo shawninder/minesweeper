@@ -1,9 +1,7 @@
 'use client'
 
 import { useEffect, useReducer, useRef, useState } from 'react'
-import { toast } from 'sonner'
 import Controls from '@/components/Controls'
-import { Toaster } from '@/components/ui/sonner'
 import {
   BACKGROUND_CLASS_BY_GAME_STATE,
   BORDER_CLASS_BY_GAME_STATE,
@@ -230,19 +228,6 @@ function Game() {
     return () => observer.disconnect()
   }, [])
 
-  useEffect(() => {
-    switch (state.gameState) {
-      case 'lost':
-        toast('You Lost')
-        break
-      case 'won':
-        toast('You Won!')
-        break
-      default:
-        break
-    }
-  }, [state.gameState])
-
   const flaggedCount = state.cells.reduce<number>((count, { isFlagged }) => {
     if (isFlagged) {
       count += 1
@@ -341,7 +326,6 @@ function Game() {
       >
         {state.cells.map(renderCell)}
       </div>
-      <Toaster />
     </div>
   )
 }
