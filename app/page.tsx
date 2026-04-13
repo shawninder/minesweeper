@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useReducer, useRef } from 'react'
+import { useEffect, useReducer, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import Controls from '@/components/Controls'
 import { Toaster } from '@/components/ui/sonner'
@@ -213,7 +213,8 @@ export default function Page() {
 function Game() {
   const gameRef = useRef<HTMLDivElement>(null)
   const boardRef = useRef<HTMLDivElement>(null)
-  const longPressTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [longPressTarget, setLongPressTarget] = useState<number | null>(null)
+  const longPressTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const [state, dispatch] = useReducer(gameReducer, initialState)
 
   useEffect(() => {
@@ -251,16 +252,22 @@ function Game() {
 
   function clickCell(cellIndex: number) {
     return () => {
+      if (longPressTarget !== null) {
+        return
+      }
       dispatch({ type: 'CELL_PRESS', cellIndex })
     }
   }
 
   function pointerDown(cellIndex: number) {
     return () => {
+      setLongPressTarget(null)
+
       if (longPressTimeoutRef.current) {
         clearTimeout(longPressTimeoutRef.current)
       }
       longPressTimeoutRef.current = setTimeout(() => {
+        setLongPressTarget(cellIndex)
         dispatch({ type: 'CELL_LONG_PRESS', cellIndex })
       }, LONG_PRESS_DURATION_MS)
     }

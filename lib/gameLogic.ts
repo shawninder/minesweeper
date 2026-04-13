@@ -39,59 +39,69 @@ export function discloseCell(
   const wasDisclosed = cell.isDisclosed
 
   if (isFlagged) {
+    // UNFLAG
     cell.isFlagged = false
     return nextCells
   }
 
+  // DISCLOSE
   cell.isDisclosed = true
-  if (adjacentMineCount !== 0) {
-    if (wasDisclosed) {
-      const neighbors = getNeighbors(nextCells, rows, cols, index)
-      const [adjacentFlags, adjacentMines, mistakes, toDisclose] =
-        neighbors.reduce<[number, number, number, number[]]>(
-          ([flagCount, mineCount, mistakeCount, pending], neighborIndex) => {
-            const neighbor = nextCells[neighborIndex]
-            if (neighbor.isFlagged) flagCount += 1
-            if (neighbor.isMine) mineCount += 1
-            if (neighbor.isFlagged && !neighbor.isMine) mistakeCount += 1
-            if (!neighbor.isFlagged && !neighbor.isMine && !neighbor.isDisclosed) {
-              pending.push(neighborIndex)
-            }
 
-            return [flagCount, mineCount, mistakeCount, pending]
-          },
-          [0, 0, 0, []]
-        )
+  if (adjacentMineCount === 0) {
+    // AUTO-DISCLOSE NEIGHBORS
+    const queue: number[] = [index]
+    let queueIndex = 0
 
-      if (mistakes === 0 && adjacentFlags === adjacentMines) {
-        toDisclose.forEach((neighborIndex) => {
-          nextCells = discloseCell(nextCells, rows, cols, neighborIndex)
-        })
+    while (queueIndex < queue.length) {
+      const current = queue[queueIndex++]
+      if (nextCells[current].adjacentMineCount !== 0) {
+        continue
+      }
+
+      for (const neighborIndex of getNeighbors(nextCells, rows, cols, current)) {
+        const neighbor = nextCells[neighborIndex]
+        if (neighbor.isDisclosed || neighbor.isMine || neighbor.isFlagged) {
+          continue
+        }
+
+        // DISCLOSE NEIGHBOR
+        neighbor.isDisclosed = true
+
+        if (neighbor.adjacentMineCount === 0) {
+          // ENQUEUE NEIGHBOR
+          queue.push(neighborIndex)
+        }
       }
     }
 
     return nextCells
   }
 
-  const queue: number[] = [index]
-  let queueIndex = 0
+  if (wasDisclosed) {
+    // CHORD
+    const neighbors = getNeighbors(nextCells, rows, cols, index)
+    const [mistakes, toDisclose] =
+      neighbors.reduce<[number, number[]]>(
+        ([mistakeCount, pending], neighborIndex) => {
+          const neighbor = nextCells[neighborIndex]
 
-  while (queueIndex < queue.length) {
-    const current = queue[queueIndex++]
-    if (nextCells[current].adjacentMineCount !== 0) {
-      continue
-    }
+          if ((neighbor.isFlagged && !neighbor.isMine) || (!neighbor.isFlagged && neighbor.isMine)) {
+            mistakeCount += 1
+          }
+          if (!neighbor.isFlagged && !neighbor.isMine && !neighbor.isDisclosed) {
+            // ENQUEUE NEIGHBOR
+            pending.push(neighborIndex)
+          }
 
-    for (const neighborIndex of getNeighbors(nextCells, rows, cols, current)) {
-      const neighbor = nextCells[neighborIndex]
-      if (neighbor.isDisclosed || neighbor.isMine) {
-        continue
-      }
+          return [mistakeCount, pending]
+        },
+        [0, []]
+      )
 
-      neighbor.isDisclosed = true
-      if (neighbor.adjacentMineCount === 0) {
-        queue.push(neighborIndex)
-      }
+    if (mistakes === 0) {
+      toDisclose.forEach((neighborIndex) => {
+        nextCells = discloseCell(nextCells, rows, cols, neighborIndex)
+      })
     }
   }
 
@@ -212,6 +222,8 @@ export function evaluateGameState(
 
   let hasUntouchedCells = false
   let revealedMine = false
+  let allMinesFlagged = true
+  let allFlagsCorrect = true
 
   cells.forEach(({ isDisclosed, isMine, isFlagged }) => {
     if (!isFlagged && !isDisclosed) {
@@ -220,10 +232,16 @@ export function evaluateGameState(
     if (isDisclosed && isMine) {
       revealedMine = true
     }
+    if (isMine && !isFlagged) {
+      allMinesFlagged = false
+    }
+    if (isFlagged && !isMine) {
+      allFlagsCorrect = false
+    }
   })
 
   if (revealedMine) return 'lost'
-  if (!hasUntouchedCells) return 'won'
+  if (!hasUntouchedCells && allMinesFlagged && allFlagsCorrect) return 'won'
   return 'playing'
 }
 
