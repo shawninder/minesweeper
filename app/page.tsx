@@ -13,30 +13,19 @@ import {
 } from '@/lib/colors'
 import {
   type Cell,
-  type GameState,
+  type GameModel,
+  type AvailableSpace,
+  type CellDimensions,
   discloseCell as discloseOrChordCell,
   evaluateGameState,
   flagCell,
-  generateMines,
   makeCells,
-  numberCells,
-  getMineCount
+  getMineCount,
+  startGame
 } from '@/lib/gameLogic'
 
-type AvailableSpace = {
-  width: number
-  height: number
-}
-
-type GameModel = {
-  gameState: GameState
-  availableSpace: AvailableSpace
-  rows: number
-  cols: number
-  mines: number
-  cells: Cell[]
-  cellDimensions: CellDimensions
-}
+const FLAG = '🚩'
+const MINE = '💣'
 
 type GameAction =
   | { type: 'BOARD_RESIZED'; width: number; height: number }
@@ -66,11 +55,6 @@ const initialState: GameModel = {
     rows: initialRows,
     cols: initialCols
   })
-}
-
-type CellDimensions = {
-  width: number
-  height: number
 }
 
 type GridSize = {
@@ -150,20 +134,9 @@ function gameReducer(state: GameModel, action: GameAction): GameModel {
       if (state.gameState !== 'ready' && state.gameState !== 'playing') {
         return state
       }
-
       const cellsBeforeDisclose =
         state.gameState === 'ready'
-          ? numberCells(
-              generateMines(
-                state.cells,
-                rows,
-                cols,
-                action.cellIndex,
-                state.mines
-              ),
-              state.rows,
-              state.cols
-            )
+          ? startGame(state, action.cellIndex)
           : state.cells
 
       const cell = cellsBeforeDisclose[action.cellIndex]
@@ -267,7 +240,7 @@ function Game() {
   }
 
   function renderCell(
-    { isMine, adjacentMineCount, isDisclosed, isFlagged }: Cell,
+    { isMine, adjacentMineCount, isDisclosed, isFlagged, isFirstDisclosed }: Cell,
     index: number
   ) {
     const { mine, number, flag, undisclosed } = CELL_BACKGROUND_CLASS_BY_STATE
@@ -303,19 +276,15 @@ function Game() {
         onPointerDown={pointerDown(index)}
         onPointerUp={pointerUp()}
       >
-        {isDisclosed ? (isMine ? '💣' : adjacentMineCount || '') : ''}
-        {isFlagged ? '🚩' : ''}
+        {isFirstDisclosed && (<Controls mines={state.mines} flagged={flaggedCount} />)}
+        {isDisclosed ? (isMine ? MINE : adjacentMineCount || '') : ''}
+        {isFlagged ? FLAG : ''}
       </button>
     )
   }
 
   return (
     <div className='w-full h-full' ref={gameRef}>
-      <Controls
-        mines={state.mines}
-        flagged={flaggedCount}
-        state={state.gameState}
-      />
       <div
         ref={boardRef}
         className={`minesweeper-board grid ${BORDER_CLASS_BY_GAME_STATE[state.gameState]} ${BACKGROUND_CLASS_BY_GAME_STATE[state.gameState]} w-full h-full justify-center content-center select-none font-bold`}

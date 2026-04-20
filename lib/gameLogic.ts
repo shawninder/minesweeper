@@ -5,6 +5,7 @@ export type Cell = {
   adjacentMineCount: number
   isDisclosed: boolean
   isFlagged: boolean
+  isFirstDisclosed: boolean
 }
 
 export function makeCells(cellCount: number): Cell[] {
@@ -12,7 +13,8 @@ export function makeCells(cellCount: number): Cell[] {
     isMine: false,
     adjacentMineCount: -1,
     isDisclosed: false,
-    isFlagged: false
+    isFlagged: false,
+    isFirstDisclosed: false
   }))
 }
 
@@ -126,7 +128,8 @@ export function numberCells(cells: Cell[], rows: number, cols: number): Cell[] {
       isMine: false,
       adjacentMineCount,
       isDisclosed: false,
-      isFlagged: false
+      isFlagged: false,
+      isFirstDisclosed: cell.isFirstDisclosed
     }
   })
 }
@@ -253,4 +256,41 @@ export function getMineCount(cellCount: number) {
   return Math.round(
     MINE_CURVE_A * cellCount * cellCount + MINE_CURVE_B * cellCount + MINE_CURVE_C
   )
+}
+
+export type AvailableSpace = {
+  width: number
+  height: number
+}
+
+export type CellDimensions = {
+  width: number
+  height: number
+}
+
+export type GameModel = {
+  gameState: GameState
+  availableSpace: AvailableSpace
+  rows: number
+  cols: number
+  mines: number
+  cells: Cell[]
+  cellDimensions: CellDimensions
+}
+
+export function startGame ({cells, rows, cols, mines}: GameModel, cellIndex: number) {
+  cells[cellIndex].isFirstDisclosed = true
+  const cellsWithMines = generateMines(
+    cells,
+    rows,
+    cols,
+    cellIndex,
+    mines
+  )
+  const cellsWithNumbers = numberCells(
+    cellsWithMines,
+    rows,
+    cols
+  )
+  return cellsWithNumbers
 }
