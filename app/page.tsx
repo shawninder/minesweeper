@@ -74,19 +74,15 @@ function gameReducer(state: GameModel, action: GameAction): GameModel {
   switch (action.type) {
     case 'BOARD_RESIZED': {
       if (state.gameState !== 'loading' && state.gameState !== 'ready') {
-        return state
+        return {
+          ...state,
+          availableSpace: { width: action.width, height: action.height }
+        }
       }
 
       const { width, height } = action
 
-      const rows = Math.floor(height / MIN_CELL_SIZE_PX)
-      const cols = Math.floor(width / MIN_CELL_SIZE_PX)
-      const cellCount = rows * cols
-
-      const cellDimensions = getCellDimensions(
-        { width, height },
-        { rows, cols }
-      )
+      const { rows, cols, cellCount, cellDimensions } = calculateCellLayout(width, height)
 
       return {
         ...state,
@@ -120,13 +116,17 @@ function gameReducer(state: GameModel, action: GameAction): GameModel {
     }
 
     case 'CELL_PRESS': {
-      const { rows, cols } = state
       if (state.gameState === 'won' || state.gameState === 'lost') {
+        const { rows, cols, cellCount, cellDimensions } = calculateCellLayout(state.availableSpace.width, state.availableSpace.height)
         // RESET
         return {
           ...state,
           gameState: 'ready',
-          cells: makeCells(rows * cols)
+          rows,
+          cols,
+          mines: getMineCount(cellCount),
+          cells: makeCells(cellCount),
+          cellDimensions
         }
       }
 
@@ -297,7 +297,7 @@ function Game() {
     <div className='w-full h-full' ref={gameRef}>
       <div
         ref={boardRef}
-        className={`minesweeper-board grid ${BORDER_CLASS_BY_GAME_STATE[state.gameState]} ${BACKGROUND_CLASS_BY_GAME_STATE[state.gameState]} w-full h-full justify-center content-center select-none font-bold`}
+        className={`minesweeper-board grid ${BORDER_CLASS_BY_GAME_STATE[state.gameState]} ${BACKGROUND_CLASS_BY_GAME_STATE[state.gameState]} w-full h-full select-none font-bold`}
         style={{
           gridTemplateColumns: `repeat(${state.cols}, ${state.cellDimensions.width}px)`,
           gridTemplateRows: `repeat(${state.rows}, ${state.cellDimensions.height}px)`
@@ -307,4 +307,17 @@ function Game() {
       </div>
     </div>
   )
+}
+
+function calculateCellLayout(width: number, height: number): { rows: number; cols: number; cellCount: number; cellDimensions: CellDimensions } {
+  const rows = Math.floor(height / MIN_CELL_SIZE_PX)
+  const cols = Math.floor(width / MIN_CELL_SIZE_PX)
+  const cellCount = rows * cols
+
+  const cellDimensions = getCellDimensions(
+    { width, height },
+    { rows, cols }
+  )
+
+  return { rows, cols, cellCount, cellDimensions}
 }
