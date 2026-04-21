@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useReducer, useRef, useState } from 'react'
-import Controls from '@/components/Controls'
 import {
   BACKGROUND_CLASS_BY_GAME_STATE,
   BORDER_CLASS_BY_GAME_STATE,
@@ -267,6 +266,8 @@ function Game() {
     const textShadowSizeClass =
       isDisclosed && !isMine ? 'text-shadow-none' : 'text-shadow-lg'
 
+    const nbMinesLeft = state.mines - flaggedCount
+
     return (
       <button
         key={index}
@@ -276,7 +277,16 @@ function Game() {
         onPointerDown={pointerDown(index)}
         onPointerUp={pointerUp()}
       >
-        {isFirstDisclosed && (<Controls mines={state.mines} flagged={flaggedCount} />)}
+        {isFirstDisclosed && (
+          <div className='w-full h-full flex justify-center items-center bg-secondary'>
+            <div className='[word-spacing:0.6em]'>
+              {nbMinesLeft}{' '}
+              {/* <span className='inline-block translate-y-0.5 [text-shadow:-2px_0px_4px_#ffffff]'>{MINE}</span> */}
+              <span className='[text-shadow:0_0_5px_var(--foreground),0_0_10px_var(--foreground),0_0_15px_var(--foreground),0_0_20px_var(--muted-foreground),0_0_35px_var(--muted-foreground),0_0_40px_var(--muted-foreground),0_0_50px_var(--muted-foreground)]'>{MINE}</span>
+              {/* <span className='inline-block translate-y-0.5 [text-shadow:-2px_0px_4px_#ffffff]'>{MINE}</span> */}
+            </div>
+          </div>
+        )}
         {isDisclosed ? (isMine ? MINE : adjacentMineCount || '') : ''}
         {isFlagged ? FLAG : ''}
       </button>
