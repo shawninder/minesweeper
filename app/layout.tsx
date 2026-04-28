@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Minesweeper',
-  applicationName: 'Minesweeper',
+  title: '💣',
+  applicationName: '💣',
   description:
     'Classic mobile-ready Minesweeper game which you can play offline and add to your home screen for free without ads.',
   icons: {
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Minesweeper'
+    title: '💣'
   }
 }
 

@@ -1,4 +1,4 @@
-# Minesweeper
+# 💣
 
 Classic mobile-ready Minesweeper game which you can play offline and add to your home screen for free without ads.
 
