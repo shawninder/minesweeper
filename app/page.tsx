@@ -29,8 +29,7 @@ const MINE = '💣'
 type GameAction =
   | { type: 'BOARD_RESIZED'; width: number; height: number }
   | { type: 'RESOLVE_ACTION'; cellIndex: number; discloseArmed: boolean }
-  | { type: 'CELL_LONG_PRESS'; cellIndex: number }
-  | { type: 'CELL_PRESS'; cellIndex: number }
+  | { type: 'CELL_PRESS'; cellIndex: number; long: boolean }
 
 const MIN_CELL_SIZE_PX = 56
 const LONG_PRESS_DURATION_MS = 500
@@ -96,25 +95,6 @@ function gameReducer(state: GameModel, action: GameAction): GameModel {
       }
     }
 
-    case 'CELL_LONG_PRESS': {
-      if (state.gameState !== 'playing') {
-        return state
-      }
-      const nextCells = discloseOrChordCell(
-        state.cells,
-        state.rows,
-        state.cols,
-        action.cellIndex
-      )
-      const nextGameState = evaluateGameState(nextCells, action.cellIndex, true)
-
-      return {
-        ...state,
-        gameState: nextGameState,
-        cells: nextCells
-      }
-    }
-
     case 'CELL_PRESS': {
       if (state.gameState === 'won' || state.gameState === 'lost') {
         const { rows, cols, cellCount, cellDimensions } = calculateCellLayout(state.availableSpace.width, state.availableSpace.height)
@@ -131,6 +111,7 @@ function gameReducer(state: GameModel, action: GameAction): GameModel {
       }
 
       if (state.gameState !== 'ready' && state.gameState !== 'playing') {
+        // IGNORE
         return state
       }
       const cellsBeforeDisclose =
@@ -139,7 +120,7 @@ function gameReducer(state: GameModel, action: GameAction): GameModel {
           : state.cells
 
       const cell = cellsBeforeDisclose[action.cellIndex]
-      if (!cell.isDisclosed && state.gameState === 'playing') {
+      if (!cell.isDisclosed && state.gameState === 'playing' && !action.long) {
         // Flag
         const nextCells = flagCell(cellsBeforeDisclose, action.cellIndex)
         const nextGameState = evaluateGameState(
@@ -212,7 +193,7 @@ function Game() {
       if (longPressTarget !== null) {
         return
       }
-      dispatch({ type: 'CELL_PRESS', cellIndex })
+      dispatch({ type: 'CELL_PRESS', cellIndex, long: false })
     }
   }
 
@@ -225,7 +206,7 @@ function Game() {
       }
       longPressTimeoutRef.current = setTimeout(() => {
         setLongPressTarget(cellIndex)
-        dispatch({ type: 'CELL_LONG_PRESS', cellIndex })
+        dispatch({ type: 'CELL_PRESS', cellIndex, long: true })
       }, LONG_PRESS_DURATION_MS)
     }
   }
