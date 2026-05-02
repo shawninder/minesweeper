@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "npx serve@latest out",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run"
   },
   "dependencies": {
     "address": "2.0.3",
@@ -30,7 +31,8 @@
     "eslint": "10.3.0",
     "eslint-config-next": "16.2.4",
     "tailwindcss": "4.2.4",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "vitest": "4.1.5"
   },
   "overrides": {
     "postcss": "8.5.13"
